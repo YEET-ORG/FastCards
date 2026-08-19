@@ -1,0 +1,209 @@
+// Server-backed domain store. The financial backend is the source of
+// truth; this provider fetches the session-scoped state and exposes the
+// same `useDomain()` shape the screens were built on. `dispatch` keeps
+// its action-object signature but is now a facade: each action maps to
+// an API call (rule changes go through the server's PREPARE→EXECUTE
+// gateway) followed by a refresh.
+
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+
+import { api, ApiError } from '@/api/client';
+import { useAuth } from '@/auth/AuthContext';
+import { PrimaryButton } from '@/components/fin/Buttons';
+import { AppText } from '@/design/AppText';
+import { color, space } from '@/design/tokens';
+import { Toast } from '@/shared/ui/molecules/Toast';
+
+import type { DomainState } from './types';
+
+type DomainAction =
+  | { type: 'freeze_card'; cardId: string }
+  | { type: 'unfreeze_card'; cardId: string }
+  | { type: 'approve_once'; approvalId: string }
+  | { type: 'decline_approval'; approvalId: string }
+  | { type: 'temp_allowance'; memberId: string; amount: number; expiresAt: string; expiresAtLabel: string }
+  | { type: 'set_monthly_limit'; memberId: string; amount: number }
+  | { type: 'set_approval_threshold'; cardId: string; amount: number }
+  | { type: 'toggle_channel'; cardId: string; channel: 'online' | 'contactless' | 'atm' | 'international' }
+  | { type: 'toggle_category'; memberId: string; categoryKey: string };
+
+interface DomainContextValue {
+  state: DomainState;
+  dispatch: (action: DomainAction) => Promise<void>;
+  refresh: () => Promise<void>;
+}
+
+const DomainContext = createContext<DomainContextValue | null>(null);
+
+const showError = (e: unknown) => {
+  const message = e instanceof ApiError ? e.message : 'Network problem — nothing has changed.';
+  Toast.show(message, { type: 'default', position: 'bottom', backgroundColor: color.surface3 });
+};
+
+export function DomainProvider({ children }: React.PropsWithChildren) {
+  const { headers, session } = useAuth();
+  const [state, setState] = useState<DomainState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const headersRef = useRef(headers);
+  headersRef.current = headers;
+
+  const refresh = useCallback(async () => {
+    try {
+      const next = await api.fetchDomainState(headersRef.current);
+      setState(next);
+      setError(null);
+    } catch (e) {
+      if (state === null) {
+        setError(e instanceof ApiError ? e.message : 'Could not reach the FastCards server.');
+      } else {
+        showError(e);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state === null]);
+
+  useEffect(() => {
+    setState(null);
+    setError(null);
+    void refresh();
+    // Refetch when the signed-in user changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.userId]);
+
+  /**
+   * Rule changes route through the trusted gateway: prepare on the
+   * server, then execute echoing the server's facts hash. The screen has
+   * already shown its own ConfirmSheet before dispatching.
+   */
+  const prepareAndExecute = useCallback(async (intent: object) => {
+    const action = await api.prepareAction(headersRef.current, intent);
+    await api.executeAction(headersRef.current, action.id, action.factsHash, `app-${action.id}`);
+  }, []);
+
+  const dispatch = useCallback(
+    async (action: DomainAction) => {
+      const h = headersRef.current;
+      try {
+        switch (action.type) {
+          case 'freeze_card':
+            await api.freezeCard(h, action.cardId, true);
+            break;
+          case 'unfreeze_card':
+            await api.freezeCard(h, action.cardId, false);
+            break;
+          case 'approve_once':
+            await api.approveOnce(h, action.approvalId);
+            break;
+          case 'decline_approval':
+            await api.declineApproval(h, action.approvalId);
+            break;
+          case 'temp_allowance':
+            await prepareAndExecute({
+              kind: 'temp_allowance',
+              memberId: action.memberId,
+              amount: action.amount,
+              expiresAt: action.expiresAt,
+            });
+            break;
+          case 'set_monthly_limit':
+            await prepareAndExecute({ kind: 'set_monthly_limit', memberId: action.memberId, amount: action.amount });
+            break;
+          case 'set_approval_threshold':
+            await prepareAndExecute({ kind: 'set_approval_threshold', cardId: action.cardId, amount: action.amount });
+            break;
+          case 'toggle_channel': {
+            const card = state?.cards.find((c) => c.id === action.cardId);
+            await api.setChannel(h, action.cardId, action.channel, !(card?.channels[action.channel] ?? false));
+            break;
+          }
+          case 'toggle_category': {
+            const member = state?.members.find((m) => m.id === action.memberId);
+            const cat = member?.categories.find((c) => c.key === action.categoryKey);
+            await api.setCategory(h, action.memberId, action.categoryKey, !(cat?.enabled ?? false));
+            break;
+          }
+        }
+        await refresh();
+      } catch (e) {
+        showError(e);
+        await refresh();
+      }
+    },
+    [prepareAndExecute, refresh, state],
+  );
+
+  const value = useMemo<DomainContextValue | null>(
+    () => (state ? { state, dispatch, refresh } : null),
+    [state, dispatch, refresh],
+  );
+
+  if (error) {
+    return (
+      <View style={styles.fill}>
+        <AppText variant="section" style={{ textAlign: 'center' }}>
+          Can't reach the server
+        </AppText>
+        <AppText variant="secondary" tone={color.textTertiary} style={{ textAlign: 'center' }}>
+          {error}
+        </AppText>
+        <PrimaryButton label="Retry" onPress={() => void refresh()} style={{ minWidth: 160 }} />
+      </View>
+    );
+  }
+  if (!value) {
+    return (
+      <View style={styles.fill}>
+        <ActivityIndicator color={color.mint} />
+        <AppText variant="secondary" tone={color.textTertiary}>
+          Loading your money…
+        </AppText>
+      </View>
+    );
+  }
+  return <DomainContext.Provider value={value}>{children}</DomainContext.Provider>;
+}
+
+export function useDomain(): DomainContextValue {
+  const ctx = useContext(DomainContext);
+  if (!ctx) throw new Error('useDomain must be used inside DomainProvider');
+  return ctx;
+}
+
+// Derived selectors (unchanged signatures)
+
+export function memberRemaining(state: DomainState, memberId: string): number | undefined {
+  const m = state.members.find((x) => x.id === memberId);
+  if (!m || m.monthlyLimit === undefined) return undefined;
+  return m.monthlyLimit + (m.tempAllowance?.amount ?? 0) - m.spentThisMonth;
+}
+
+export function cardForMember(state: DomainState, memberId: string) {
+  return (
+    state.cards.find((c) => c.memberId === memberId && c.variant !== 'personal') ??
+    state.cards.find((c) => c.memberId === memberId)
+  );
+}
+
+export function pendingApprovals(state: DomainState) {
+  return state.approvals.filter((a) => a.status === 'pending');
+}
+
+const styles = StyleSheet.create({
+  fill: {
+    flex: 1,
+    backgroundColor: color.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.l,
+    padding: space.x32,
+  },
+});

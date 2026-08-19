@@ -1,0 +1,5 @@
+node_modules/
+.env
+fastcards.db
+fastcards.db-wal
+fastcards.db-shm
