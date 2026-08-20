@@ -1,10 +1,22 @@
 // READ layer — every query is scoped by the caller's session. The AI's
 // READ tools call these same functions, so context can never widen
-// permissions (spec §13.4).
+// permissions (spec §13.4). Reads come from the gateway's live
+// SpacetimeDB subscription cache (the Node process is the sole writer,
+// and reducer calls resolve only after the cache has applied their
+// transaction, so reads here are always current).
 
 import { listAudit } from '../audit.js';
 import { canReadMember, isManager } from '../authz.js';
-import type { DB } from '../db.js';
+import type { Stdb } from '../stdb/client.js';
+import {
+  mapApproval,
+  mapCard,
+  mapCategory,
+  mapMember,
+  mapPool,
+  mapTxn,
+  type PoolRowShape,
+} from '../stdb/rows.js';
 import {
   DomainError,
   type ApprovalRow,
@@ -14,21 +26,14 @@ import {
   type TransactionRow,
 } from '../types.js';
 
-export function getOverview(db: DB, session: Session) {
-  const household = db.prepare('SELECT * FROM household').get() as {
-    name: string;
-    budget_cap: number;
-    budget_spent: number;
-  };
-  const balances = Object.fromEntries(
-    (db.prepare('SELECT scope, amount FROM balances').all() as { scope: string; amount: number }[]).map(
-      (b) => [b.scope, b.amount],
-    ),
-  );
+export function getOverview(stdb: Stdb, session: Session) {
+  const h = [...stdb.db.household.iter()][0];
+  const household = { name: h?.name ?? '', budget_cap: h?.budgetCap ?? 0, budget_spent: h?.budgetSpent ?? 0 };
+  const balances = Object.fromEntries([...stdb.db.balances.iter()].map((b) => [b.scope, b.amount]));
   if (isManager(session)) {
     return { household, balances, scope: 'household' as const };
   }
-  const self = getMember(db, session, session.memberId);
+  const self = getMember(stdb, session, session.memberId);
   return {
     household: { name: household.name },
     balances: {},
@@ -37,29 +42,26 @@ export function getOverview(db: DB, session: Session) {
   };
 }
 
-export function listMembers(db: DB, session: Session) {
-  const rows = db.prepare('SELECT * FROM members').all() as unknown as MemberRow[];
+export function listMembers(stdb: Stdb, session: Session) {
+  const rows = [...stdb.db.members.iter()].map(mapMember);
   const visible = isManager(session) ? rows : rows.filter((m) => m.id === session.memberId);
-  const catStmt = db.prepare(
-    'SELECT key, label, cap, spent, enabled FROM member_categories WHERE member_id = ?',
-  );
-  return visible.map((m) => ({ ...m, categories: catStmt.all(m.id) }));
+  return visible.map((m) => ({
+    ...m,
+    categories: [...stdb.db.memberCategories.memberId.filter(m.id)].map(mapCategory),
+  }));
 }
 
-export function getMember(db: DB, session: Session, memberId: string): MemberRow & {
+export function getMember(stdb: Stdb, session: Session, memberId: string): MemberRow & {
   categories: { key: string; label: string; cap: number; spent: number; enabled: number }[];
   remaining: number | null;
 } {
   if (!canReadMember(session, memberId)) {
     throw new DomainError('permission_denied', 'You can only view your own activity.');
   }
-  const m = db.prepare('SELECT * FROM members WHERE id = ?').get(memberId) as
-    | MemberRow
-    | undefined;
-  if (!m) throw new DomainError('not_found', 'Member not found.');
-  const categories = db
-    .prepare('SELECT key, label, cap, spent, enabled FROM member_categories WHERE member_id = ?')
-    .all(memberId) as { key: string; label: string; cap: number; spent: number; enabled: number }[];
+  const raw = stdb.db.members.id.find(memberId);
+  if (!raw) throw new DomainError('not_found', 'Member not found.');
+  const m = mapMember(raw);
+  const categories = [...stdb.db.memberCategories.memberId.filter(memberId)].map(mapCategory);
   const temp = activeTempAllowance(m);
   const remaining =
     m.monthly_limit === null ? null : m.monthly_limit + temp - m.spent_this_month;
@@ -74,14 +76,15 @@ export function activeTempAllowance(m: MemberRow): number {
     : 0;
 }
 
-export function listCards(db: DB, session: Session): CardRow[] {
-  const rows = db.prepare('SELECT * FROM cards').all() as unknown as CardRow[];
+export function listCards(stdb: Stdb, session: Session): CardRow[] {
+  const rows = [...stdb.db.cards.iter()].map(mapCard);
   return isManager(session) ? rows : rows.filter((c) => c.member_id === session.memberId);
 }
 
-export function getCard(db: DB, session: Session, cardId: string): CardRow {
-  const c = db.prepare('SELECT * FROM cards WHERE id = ?').get(cardId) as CardRow | undefined;
-  if (!c) throw new DomainError('not_found', 'Card not found.');
+export function getCard(stdb: Stdb, session: Session, cardId: string): CardRow {
+  const raw = stdb.db.cards.id.find(cardId);
+  if (!raw) throw new DomainError('not_found', 'Card not found.');
+  const c = mapCard(raw);
   if (!isManager(session) && c.member_id !== session.memberId) {
     throw new DomainError('permission_denied', 'You can only view your own cards.');
   }
@@ -89,14 +92,15 @@ export function getCard(db: DB, session: Session, cardId: string): CardRow {
 }
 
 export function listTransactions(
-  db: DB,
+  stdb: Stdb,
   session: Session,
   filter: { memberId?: string; cardId?: string; limit?: number } = {},
 ): TransactionRow[] {
   const limit = Math.min(filter.limit ?? 50, 200);
-  let rows = db
-    .prepare('SELECT * FROM transactions ORDER BY at DESC LIMIT ?')
-    .all(limit * 2) as unknown as TransactionRow[];
+  let rows = [...stdb.db.transactions.iter()]
+    .map(mapTxn)
+    .sort((a, b) => (a.at < b.at ? 1 : -1))
+    .slice(0, limit * 2);
   if (!isManager(session)) rows = rows.filter((t) => t.member_id === session.memberId);
   if (filter.memberId) {
     if (!canReadMember(session, filter.memberId)) {
@@ -108,33 +112,26 @@ export function listTransactions(
   return rows.slice(0, limit);
 }
 
-export function listApprovals(db: DB, session: Session): ApprovalRow[] {
-  const rows = db
-    .prepare('SELECT * FROM approvals ORDER BY requested_at DESC')
-    .all() as unknown as ApprovalRow[];
+export function listApprovals(stdb: Stdb, session: Session): ApprovalRow[] {
+  const rows = [...stdb.db.approvals.iter()]
+    .map(mapApproval)
+    .sort((a, b) => (a.requested_at < b.requested_at ? 1 : -1));
   return isManager(session) ? rows : rows.filter((a) => a.requester_id === session.memberId);
 }
 
-export function getActivity(db: DB, session: Session) {
+export function getActivity(stdb: Stdb, session: Session) {
   if (!isManager(session)) {
     // Members see their own transactions plus audit rows about them.
     return {
-      transactions: listTransactions(db, session),
-      events: listAudit(db).filter((e) => e.member_id === session.memberId),
+      transactions: listTransactions(stdb, session),
+      events: listAudit(stdb).filter((e) => e.member_id === session.memberId),
     };
   }
-  return { transactions: listTransactions(db, session), events: listAudit(db) };
+  return { transactions: listTransactions(stdb, session), events: listAudit(stdb) };
 }
 
-export function getPool(db: DB) {
-  return db.prepare('SELECT * FROM pool').get() as {
-    id: string;
-    network: string;
-    account: string;
-    asset_code: string;
-    asset_issuer: string | null;
-    crypto_reserve_units: number;
-    fiat_float_inr: number;
-    rate_inr_per_unit: number;
-  };
+export function getPool(stdb: Stdb): PoolRowShape {
+  const p = [...stdb.db.pool.iter()][0];
+  if (!p) throw new DomainError('not_found', 'Pool not configured.');
+  return mapPool(p);
 }

@@ -7,15 +7,15 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { runAgentTurn } from '../src/agent/agent.js';
 import type { QwenConfig } from '../src/agent/qwen.js';
 import { resolveSession } from '../src/authz.js';
-import { openDb, seed, type DB } from '../src/db.js';
+import type { Stdb } from '../src/stdb/client.js';
+import { getTestStdb } from './helpers.js';
 
-process.env.NODE_ENV = 'test';
 delete process.env.AGENT_MODE;
 
-let db: DB;
-beforeEach(() => {
-  db = openDb(':memory:');
-  seed(db);
+let db: Stdb;
+beforeEach(async () => {
+  db = await getTestStdb();
+  await db.call((r) => r.devReset({ confirm: 'RESET-FASTCARDS' }));
 });
 
 type FakeTurn = (body: any) => object; // returns the assistant message
@@ -87,8 +87,7 @@ describe('Qwen tool loop', () => {
     expect(result.prepared[0].kind).toBe('temp_allowance');
 
     // Nothing executed
-    const m = db.prepare("SELECT temp_allowance_amount FROM members WHERE id='m-maya'").get() as any;
-    expect(m.temp_allowance_amount).toBeNull();
+    expect(db.db.members.id.find('m-maya')?.tempAllowanceAmount).toBeUndefined();
   });
 
   it('rejects invalid tool arguments without crashing or mutating', async () => {

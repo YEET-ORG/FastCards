@@ -2,7 +2,7 @@
 // are configured (offline dev, CI). Same authority model as the LLM path:
 // it only calls READ services and prepareAction.
 
-import type { DB } from '../db.js';
+import type { Stdb } from '../stdb/client.js';
 import { prepareAction } from '../services/actions.js';
 import { getMember, getOverview, listApprovals, listCards, listMembers } from '../services/readModel.js';
 import { DomainError, type PreparedAction, type Session } from '../types.js';
@@ -18,23 +18,23 @@ function upcomingSundayEnd(): Date {
   return s;
 }
 
-export function interpretScripted(
-  db: DB,
+export async function interpretScripted(
+  stdb: Stdb,
   session: Session,
   input: string,
-): { text: string; prepared: PreparedAction[] } {
+): Promise<{ text: string; prepared: PreparedAction[] }> {
   const text = input.toLowerCase();
   const prepared: PreparedAction[] = [];
   const replies: string[] = [];
 
-  const members = listMembers(db, session);
+  const members = listMembers(stdb, session);
   const findMember = () => members.find((m) => text.includes(m.name.toLowerCase()));
   const amountMatch = text.replace(/,/g, '').match(/(?:₹|rs\.?\s*)?(\d{2,7})/);
   const amount = amountMatch ? Number(amountMatch[1]) : undefined;
 
-  const tryPrepare = (fn: () => PreparedAction, intro: string) => {
+  const tryPrepare = async (fn: () => Promise<PreparedAction>, intro: string) => {
     try {
-      const action = fn();
+      const action = await fn();
       prepared.push(action);
       replies.push(intro);
     } catch (e) {
@@ -44,7 +44,7 @@ export function interpretScripted(
   };
 
   if (/approv/.test(text)) {
-    const pending = listApprovals(db, session).filter((a) => a.status === 'pending');
+    const pending = listApprovals(stdb, session).filter((a) => a.status === 'pending');
     replies.push(
       pending.length === 0
         ? "You're all caught up — no approvals waiting."
@@ -60,10 +60,10 @@ export function interpretScripted(
       const until = /sunday|weekend/.test(text)
         ? upcomingSundayEnd()
         : new Date(Date.now() + 7 * 24 * 3600_000);
-      tryPrepare(
+      await tryPrepare(
         () =>
           prepareAction(
-            db,
+            stdb,
             session,
             { kind: 'temp_allowance', memberId: member.id, amount, expiresAt: until.toISOString() },
             'agent',
@@ -77,13 +77,13 @@ export function interpretScripted(
 
   if (/\b(freeze|unfreeze|pause)\b/.test(text)) {
     const member = findMember();
-    const cards = listCards(db, session);
+    const cards = listCards(stdb, session);
     const card = member ? cards.find((c) => c.member_id === member.id && c.variant !== 'personal') : undefined;
     if (card) {
       const freeze = !/unfreeze|resume/.test(text) && card.status !== 'frozen';
-      tryPrepare(
+      await tryPrepare(
         () =>
-          prepareAction(db, session, { kind: freeze ? 'freeze_card' : 'unfreeze_card', cardId: card.id }, 'agent'),
+          prepareAction(stdb, session, { kind: freeze ? 'freeze_card' : 'unfreeze_card', cardId: card.id }, 'agent'),
         `Prepared ${freeze ? 'freezing' : 'unfreezing'} ${card.nickname}. Confirm in the app to apply.`,
       );
     } else if (replies.length === 0) {
@@ -94,10 +94,10 @@ export function interpretScripted(
   if (replies.length === 0 && /\b(left|remaining|balance|limit)\b/.test(text)) {
     const member = findMember();
     if (member && member.monthly_limit !== null) {
-      const detail = getMember(db, session, member.id);
+      const detail = getMember(stdb, session, member.id);
       replies.push(`${member.name} has ${inr(detail.remaining ?? 0)} left this month of ${inr(member.monthly_limit)}.`);
     } else {
-      const overview = getOverview(db, session);
+      const overview = getOverview(stdb, session);
       const total = Object.values(overview.balances).reduce((s: number, v) => s + (v as number), 0);
       replies.push(
         overview.scope === 'household'
@@ -108,7 +108,7 @@ export function interpretScripted(
   }
 
   if (replies.length === 0 && /\b(spend|spent|spending)\b/.test(text)) {
-    const overview = getOverview(db, session);
+    const overview = getOverview(stdb, session);
     if (overview.scope === 'household') {
       replies.push(
         `The household has spent ${inr(overview.household.budget_spent!)} of the ${inr(overview.household.budget_cap!)} monthly budget.`,

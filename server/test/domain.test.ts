@@ -4,21 +4,9 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { MockCardProvider } from '../src/cards/provider.js';
+import type { MockCardProvider } from '../src/cards/provider.js';
 import { syncDeposits } from '../src/chain/stellar.js';
-import { openDb, seed, type DB } from '../src/db.js';
-import { buildApp } from '../src/server.js';
-
-process.env.NODE_ENV = 'test';
-process.env.AGENT_MODE = 'scripted';
-
-async function freshApp() {
-  const db = openDb(':memory:');
-  seed(db);
-  const provider = new MockCardProvider();
-  const { app } = await buildApp({ db, provider, verifier: null });
-  return { app, db, provider };
-}
+import { freshApp } from './helpers.js';
 
 const OWNER = { 'x-user-id': 'u-rohan' };
 const TEEN = { 'x-user-id': 'u-maya' };
@@ -209,7 +197,7 @@ describe('Approvals', () => {
 describe('Cards + provider', () => {
   it('direct freeze flips status, calls the provider when linked, and audits', async () => {
     // Link Maya's card to a provider card to verify the adapter is called
-    ctx.db.prepare("UPDATE cards SET provider_card_id='mock-1' WHERE id='c-maya'").run();
+    await ctx.stdb.call((r) => r.devLinkCardProvider({ cardId: 'c-maya', providerCardId: 'mock-1' }));
 
     const res = await ctx.app.inject({
       method: 'POST',
@@ -309,14 +297,14 @@ describe('Stellar deposit rail', () => {
     asset_issuer: process.env.STELLAR_USDC_ISSUER ?? 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
     amount,
     from: 'GSENDER',
-    to: to ?? (ctx.db.prepare('SELECT account FROM pool').get() as { account: string }).account,
+    to: to ?? [...ctx.stdb.db.pool.iter()][0]!.account,
     created_at: new Date().toISOString(),
     transaction: memo ? { memo, memo_type: 'text' } : {},
   });
 
   it('credits a memo-matched deposit at the pool rate and audits it', async () => {
     const before = (await ctx.app.inject({ url: '/api/overview', headers: OWNER })).json();
-    const result = await syncDeposits(ctx.db, fakeHorizon([payment('op-1', 'FC-ROHAN-7431', '100')]));
+    const result = await syncDeposits(ctx.stdb, fakeHorizon([payment('op-1', 'FC-ROHAN-7431', '100')]));
     expect(result.credited).toBe(1);
 
     const after = (await ctx.app.inject({ url: '/api/overview', headers: OWNER })).json();
@@ -331,9 +319,9 @@ describe('Stellar deposit rail', () => {
 
   it('is idempotent across repeated polls of the same operation', async () => {
     // Same op id twice (cursor reset simulates overlap)
-    await syncDeposits(ctx.db, fakeHorizon([payment('op-2', 'FC-ROHAN-7431', '50')]));
-    ctx.db.prepare("DELETE FROM sync_state WHERE k='horizon_cursor'").run();
-    const second = await syncDeposits(ctx.db, fakeHorizon([payment('op-2', 'FC-ROHAN-7431', '50')]));
+    await syncDeposits(ctx.stdb, fakeHorizon([payment('op-2', 'FC-ROHAN-7431', '50')]));
+    await ctx.stdb.call((r) => r.setSyncCursor({ v: '' })); // simulate cursor reset / overlapping poll
+    const second = await syncDeposits(ctx.stdb, fakeHorizon([payment('op-2', 'FC-ROHAN-7431', '50')]));
     expect(second.credited).toBe(0);
 
     const deposits = (await ctx.app.inject({ url: '/api/deposits', headers: OWNER })).json();
@@ -342,7 +330,7 @@ describe('Stellar deposit rail', () => {
 
   it('holds deposits with unknown memos instead of guessing', async () => {
     const before = (await ctx.app.inject({ url: '/api/overview', headers: OWNER })).json();
-    const result = await syncDeposits(ctx.db, fakeHorizon([payment('op-3', 'WRONG-MEMO', '75')]));
+    const result = await syncDeposits(ctx.stdb, fakeHorizon([payment('op-3', 'WRONG-MEMO', '75')]));
     expect(result.unattributed).toBe(1);
 
     const after = (await ctx.app.inject({ url: '/api/overview', headers: OWNER })).json();

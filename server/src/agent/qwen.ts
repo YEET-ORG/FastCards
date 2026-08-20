@@ -125,7 +125,7 @@ export async function runQwenTurn(
       messages.push({
         role: 'tool',
         tool_call_id: call.id,
-        content: runToolCall(toolIndex, call),
+        content: await runToolCall(toolIndex, call),
       });
     }
   }
@@ -133,7 +133,7 @@ export async function runQwenTurn(
   return 'I could not finish that request — please try again with a simpler ask.';
 }
 
-function runToolCall(toolIndex: Map<string, ToolDef>, call: QwenToolCall): string {
+async function runToolCall(toolIndex: Map<string, ToolDef>, call: QwenToolCall): Promise<string> {
   const tool = toolIndex.get(call.function.name);
   if (!tool) {
     return JSON.stringify({ error: 'unknown_tool', message: `No tool named ${call.function.name}.` });

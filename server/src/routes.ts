@@ -10,9 +10,11 @@ import type { PrivyClient } from '@privy-io/node';
 import { runAgentTurn } from './agent/agent.js';
 import { assertManager, assertStepUp, resolveSession, type AuthContext } from './authz.js';
 import type { CardProvider } from './cards/provider.js';
+import { appendAudit } from './audit.js';
 import { getDepositIntent, listDeposits, syncDeposits } from './chain/stellar.js';
 import { bootstrapPool, processWithdrawals } from './chain/treasury.js';
-import type { DB } from './db.js';
+import type { Stdb } from './stdb/client.js';
+import { mapWallet, mapWithdrawal } from './stdb/rows.js';
 import {
   acceptInvite,
   approveOnce,
@@ -27,6 +29,7 @@ import {
 import {
   adminApproveOrder,
   adminListOrders,
+  adminListPendingKyc,
   adminRejectOrder,
   adminReviewKyc,
   adminSetProviderPool,
@@ -109,7 +112,7 @@ const chatSchema = z.object({
 
 export function registerRoutes(
   app: FastifyInstance,
-  db: DB,
+  stdb: Stdb,
   provider: CardProvider,
   auth: AuthContext,
   privyApi: PrivyClient | null = null,
@@ -129,44 +132,46 @@ export function registerRoutes(
   });
 
   const session = (req: FastifyRequest) =>
-    resolveSession(db, auth, req.headers as { authorization?: string; 'x-user-id'?: string });
+    resolveSession(stdb, auth, req.headers as { authorization?: string; 'x-user-id'?: string });
   const assertion = (req: FastifyRequest) => req.headers['x-auth-assertion'] as string | undefined;
 
   app.get('/health', async () => ({ ok: true, provider: provider.name, auth: auth.verifier ? 'privy' : 'dev' }));
   app.get('/readyz', async () => {
-    db.prepare('SELECT 1').get();
+    if (![...stdb.db.household.iter()].length) throw new Error('spacetimedb cache empty');
     return { ready: true };
   });
 
   // ------------------------------------------------------------- READ
-  app.get('/api/overview', async (req) => getOverview(db, await session(req)));
-  app.get('/api/members', async (req) => listMembers(db, await session(req)));
+  // Who am I — lets the app resolve its session (esp. after Privy login).
+  app.get('/api/session', async (req) => session(req));
+  app.get('/api/overview', async (req) => getOverview(stdb, await session(req)));
+  app.get('/api/members', async (req) => listMembers(stdb, await session(req)));
   app.get('/api/members/:id', async (req) =>
-    getMember(db, await session(req), (req.params as { id: string }).id),
+    getMember(stdb, await session(req), (req.params as { id: string }).id),
   );
-  app.get('/api/cards', async (req) => listCards(db, await session(req)));
-  app.get('/api/cards/:id', async (req) => getCard(db, await session(req), (req.params as { id: string }).id));
+  app.get('/api/cards', async (req) => listCards(stdb, await session(req)));
+  app.get('/api/cards/:id', async (req) => getCard(stdb, await session(req), (req.params as { id: string }).id));
   app.get('/api/transactions', async (req) => {
     const q = req.query as { memberId?: string; cardId?: string; limit?: string };
-    return listTransactions(db, await session(req), {
+    return listTransactions(stdb, await session(req), {
       memberId: q.memberId,
       cardId: q.cardId,
       limit: q.limit ? Number(q.limit) : undefined,
     });
   });
-  app.get('/api/approvals', async (req) => listApprovals(db, await session(req)));
-  app.get('/api/activity', async (req) => getActivity(db, await session(req)));
+  app.get('/api/approvals', async (req) => listApprovals(stdb, await session(req)));
+  app.get('/api/activity', async (req) => getActivity(stdb, await session(req)));
 
   // -------------------------------------------------- Stellar rail / pool
   app.get('/api/pool', async (req) => {
     await session(req);
-    return getPool(db);
+    return getPool(stdb);
   });
-  app.get('/api/deposits/intent', async (req) => getDepositIntent(db, await session(req)));
-  app.get('/api/deposits', async (req) => listDeposits(db, await session(req)));
+  app.get('/api/deposits/intent', async (req) => getDepositIntent(stdb, await session(req)));
+  app.get('/api/deposits', async (req) => listDeposits(stdb, await session(req)));
   app.post('/api/deposits/sync', async (req) => {
     await session(req);
-    return syncDeposits(db);
+    return syncDeposits(stdb);
   });
   // Treasury: the pool is a Privy Stellar server wallet. Bootstrap
   // creates + friendbot-funds it (testnet); process signs queued
@@ -176,27 +181,31 @@ export function registerRoutes(
     assertManager(s);
     assertStepUp(assertion(req));
     if (!privyApi) throw new DomainError('invalid_request', 'Privy app secret is not configured.');
-    return bootstrapPool(db, privyApi);
+    return bootstrapPool(stdb, privyApi);
   });
   app.post('/api/treasury/process', async (req) => {
     const s = await session(req);
     assertManager(s);
     if (!privyApi) throw new DomainError('invalid_request', 'Privy app secret is not configured.');
-    return processWithdrawals(db, privyApi);
+    return processWithdrawals(stdb, privyApi);
   });
 
   app.get('/api/withdrawals', async (req) => {
     const s = await session(req);
-    const rows = db.prepare('SELECT * FROM withdrawals ORDER BY at DESC LIMIT 50').all() as {
-      user_id: string;
-    }[];
+    const rows = [...stdb.db.withdrawals.iter()]
+      .map(mapWithdrawal)
+      .sort((a, b) => (a.at < b.at ? 1 : -1))
+      .slice(0, 50);
     return s.role === 'owner' || s.role === 'admin' ? rows : rows.filter((w) => w.user_id === s.userId);
   });
 
   // ------------------------------------------------------------ Wallets
   app.get('/api/wallets', async (req) => {
     const s = await session(req);
-    return db.prepare('SELECT address, chain_type, source, linked_at FROM user_wallets WHERE user_id = ?').all(s.userId);
+    return [...stdb.db.userWallets.userId.filter(s.userId)].map((w) => {
+      const { user_id: _drop, ...rest } = mapWallet(w);
+      return rest;
+    });
   });
   // Manual registration for chains Privy doesn't embed (e.g. external
   // Stellar wallets) — used for deposit attribution by sender address.
@@ -205,21 +214,21 @@ export function registerRoutes(
     const body = z
       .object({ address: z.string().regex(/^G[A-Z2-7]{55}$/, 'Stellar address expected'), chainType: z.literal('stellar') })
       .parse(req.body);
-    db.prepare(
-      'INSERT INTO user_wallets (user_id, address, chain_type, source, linked_at) VALUES (?,?,?,?,?) ON CONFLICT(user_id, address) DO NOTHING',
-    ).run(s.userId, body.address, body.chainType, 'manual', new Date().toISOString());
+    await stdb.call((r) =>
+      r.linkWallet({ userId: s.userId, address: body.address, chainType: body.chainType, source: 'manual' }),
+    );
     return { linked: true, address: body.address };
   });
 
   // ------------------------------------------------- PREPARE / EXECUTE
   app.post('/api/actions/prepare', async (req) => {
     const intent = intentSchema.parse(req.body);
-    return prepareAction(db, await session(req), intent, 'user');
+    return prepareAction(stdb, await session(req), intent, 'user');
   });
 
   app.post('/api/actions/:id/execute', async (req) => {
     const body = executeSchema.parse(req.body);
-    return executeAction(db, await session(req), provider, {
+    return executeAction(stdb, await session(req), provider, {
       actionId: (req.params as { id: string }).id,
       factsHash: body.factsHash,
       idempotencyKey: body.idempotencyKey,
@@ -228,14 +237,14 @@ export function registerRoutes(
   });
 
   app.post('/api/actions/:id/cancel', async (req) => {
-    cancelAction(db, await session(req), (req.params as { id: string }).id);
+    await cancelAction(stdb, await session(req), (req.params as { id: string }).id);
     return { cancelled: true };
   });
 
   // Direct manual freeze (reversible → no prepared action, spec UI §12)
   app.post('/api/cards/:id/freeze', async (req) => {
     const body = z.object({ frozen: z.boolean() }).parse(req.body);
-    return directFreeze(db, await session(req), provider, (req.params as { id: string }).id, body.frozen);
+    return directFreeze(stdb, await session(req), provider, (req.params as { id: string }).id, body.frozen);
   });
 
   // Sensitive card credentials (spec §11): step-up required, never enters
@@ -243,15 +252,19 @@ export function registerRoutes(
   app.get('/api/cards/:id/sensitive', async (req) => {
     const s = await session(req);
     assertStepUp(assertion(req));
-    const card = getCard(db, s, (req.params as { id: string }).id);
+    const card = getCard(stdb, s, (req.params as { id: string }).id);
     if (!card.provider_card_id) {
       return { available: false, reason: 'This card has no provider credentials yet.' };
     }
     const raw: any = await provider.getDetails(card.provider_card_id);
     const d = raw?.details ?? raw ?? {};
-    db.prepare(
-      'INSERT INTO audit_events (kind,title,subtitle,amount,member_id,actor,at) VALUES (?,?,?,?,?,?,?)',
-    ).run('security_event', `Card details viewed — ${card.nickname}`, `By ${s.name}`, null, card.member_id, s.name, new Date().toISOString());
+    await appendAudit(stdb, {
+      kind: 'security_event',
+      title: `Card details viewed — ${card.nickname}`,
+      subtitle: `By ${s.name}`,
+      memberId: card.member_id ?? undefined,
+      actor: s.name,
+    });
     return {
       available: true,
       cardNumber: d.card_number ?? d.cardNumber ?? d.number ?? null,
@@ -265,21 +278,21 @@ export function registerRoutes(
     const body = z
       .object({ channel: z.enum(['online', 'contactless', 'atm', 'international']), enabled: z.boolean() })
       .parse(req.body);
-    setChannel(db, await session(req), (req.params as { id: string }).id, body.channel, body.enabled);
+    await setChannel(stdb, await session(req), (req.params as { id: string }).id, body.channel, body.enabled);
     return { updated: true };
   });
   app.post('/api/members/:id/categories', async (req) => {
     const body = z.object({ categoryKey: z.string(), enabled: z.boolean() }).parse(req.body);
-    setCategory(db, await session(req), (req.params as { id: string }).id, body.categoryKey, body.enabled);
+    await setCategory(stdb, await session(req), (req.params as { id: string }).id, body.categoryKey, body.enabled);
     return { updated: true };
   });
 
   // --------------------------------------------------------- Approvals
   app.post('/api/approvals/:id/approve-once', async (req) =>
-    approveOnce(db, await session(req), (req.params as { id: string }).id, assertion(req)),
+    approveOnce(stdb, await session(req), (req.params as { id: string }).id, assertion(req)),
   );
   app.post('/api/approvals/:id/decline', async (req) => {
-    declineApproval(db, await session(req), (req.params as { id: string }).id);
+    await declineApproval(stdb, await session(req), (req.params as { id: string }).id);
     return { declined: true };
   });
 
@@ -293,7 +306,7 @@ export function registerRoutes(
   });
   app.post('/api/kyc/submit', async (req) => {
     const body = z.object({ fullName: z.string().min(2).max(80), document: z.string().min(4).max(120) }).parse(req.body);
-    return submitKyc(db, await session(req), body);
+    return submitKyc(stdb, await session(req), body);
   });
 
   app.post('/api/card-orders', async (req) => {
@@ -304,38 +317,38 @@ export function registerRoutes(
         memberId: z.string().optional(),
       })
       .parse(req.body);
-    return createCardOrder(db, await session(req), body);
+    return createCardOrder(stdb, await session(req), body);
   });
-  app.get('/api/card-orders', async (req) => listMyOrders(db, await session(req)));
+  app.get('/api/card-orders', async (req) => listMyOrders(stdb, await session(req)));
 
   // ------------------------------------------------------ Admin console
-  app.get('/api/admin/orders', async (req) => adminListOrders(db, await session(req)));
+  app.get('/api/admin/orders', async (req) => adminListOrders(stdb, await session(req)));
   app.post('/api/admin/orders/:id/approve', async (req) => {
     const s = await session(req);
     assertStepUp(assertion(req));
-    return adminApproveOrder(db, s, provider, (req.params as { id: string }).id);
+    return adminApproveOrder(stdb, s, provider, (req.params as { id: string }).id);
   });
   app.post('/api/admin/orders/:id/reject', async (req) => {
     const body = z.object({ note: z.string().min(2).max(300) }).parse(req.body);
-    return adminRejectOrder(db, await session(req), (req.params as { id: string }).id, body.note);
+    return adminRejectOrder(stdb, await session(req), (req.params as { id: string }).id, body.note);
   });
   app.get('/api/admin/kyc', async (req) => {
     const s = await session(req);
     if (!s.isAdmin) throw new DomainError('permission_denied', 'Platform admin access required.');
-    return db.prepare("SELECT id, name, kyc_status FROM users WHERE kyc_status='pending'").all();
+    return adminListPendingKyc(stdb);
   });
   app.post('/api/admin/kyc/:userId/review', async (req) => {
     const body = z.object({ approve: z.boolean() }).parse(req.body);
-    return adminReviewKyc(db, await session(req), (req.params as { userId: string }).userId, body.approve);
+    return adminReviewKyc(stdb, await session(req), (req.params as { userId: string }).userId, body.approve);
   });
   app.get('/api/admin/provider-pool', async (req) => {
     const s = await session(req);
     if (!s.isAdmin) throw new DomainError('permission_denied', 'Platform admin access required.');
-    return getProviderPool(db);
+    return getProviderPool(stdb);
   });
   app.post('/api/admin/provider-pool', async (req) => {
     const body = z.object({ balanceUsd: z.number() }).parse(req.body);
-    return adminSetProviderPool(db, await session(req), body.balanceUsd);
+    return adminSetProviderPool(stdb, await session(req), body.balanceUsd);
   });
 
   // ----------------------------------------------------------- Invites
@@ -352,10 +365,10 @@ export function registerRoutes(
       const { did } = await auth.verifier.verify(bearer).catch(() => {
         throw new DomainError('step_up_required', 'Sign in to accept the invite.');
       });
-      return acceptInvite(db, code, { did });
+      return acceptInvite(stdb, code, { did });
     }
     if (!auth.devAuthAllowed) throw new DomainError('step_up_required', 'Sign in to accept the invite.');
-    return acceptInvite(db, code, {});
+    return acceptInvite(stdb, code, {});
   });
 
   // ---------------------------------------------------------------- AI
@@ -364,7 +377,7 @@ export function registerRoutes(
     { config: { rateLimit: { max: 12, timeWindow: '1 minute' } } },
     async (req) => {
       const body = chatSchema.parse(req.body);
-      return runAgentTurn(db, await session(req), body.messages, body.contextMemberId);
+      return runAgentTurn(stdb, await session(req), body.messages, body.contextMemberId);
     },
   );
 }

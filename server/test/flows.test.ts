@@ -1,16 +1,11 @@
 // P0 flow + auth tests: Privy session binding, transfers, card creation,
 // invitations, crypto withdrawals, and wallet-based deposit attribution.
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { AuthVerifier } from '../src/auth/privy.js';
-import { MockCardProvider } from '../src/cards/provider.js';
 import { syncDeposits } from '../src/chain/stellar.js';
-import { openDb, seed } from '../src/db.js';
-import { buildApp } from '../src/server.js';
-
-process.env.NODE_ENV = 'test';
-process.env.AGENT_MODE = 'scripted';
+import { freshApp as buildFresh } from './helpers.js';
 
 const STELLAR_ADDR = 'G' + 'A'.repeat(55);
 const OWNER = { 'x-user-id': 'u-rohan' };
@@ -28,11 +23,7 @@ const fakeVerifier: AuthVerifier = {
 };
 
 async function freshApp(withPrivy = false) {
-  const db = openDb(':memory:');
-  seed(db);
-  const provider = new MockCardProvider();
-  const { app } = await buildApp({ db, provider, verifier: withPrivy ? fakeVerifier : null });
-  return { app, db, provider };
+  return buildFresh(withPrivy ? fakeVerifier : null);
 }
 
 async function prepareAndExecute(
@@ -60,11 +51,10 @@ describe('Privy auth', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().scope).toBe('household');
 
-    const wallets = ctx.db.prepare("SELECT * FROM user_wallets WHERE user_id='u-rohan'").all();
+    const wallets = [...ctx.stdb.db.userWallets.userId.filter('u-rohan')];
     expect(wallets).toHaveLength(1);
 
-    const bound = ctx.db.prepare("SELECT privy_did FROM users WHERE id='u-rohan'").get() as any;
-    expect(bound.privy_did).toBe('did:privy:owner1');
+    expect(ctx.stdb.db.users.id.find('u-rohan')?.privyDid).toBe('did:privy:owner1');
   });
 
   it('unknown identities are refused until invited', async () => {
@@ -237,11 +227,11 @@ describe('Crypto withdrawals', () => {
 describe('Deposit attribution by linked wallet', () => {
   it('credits a memo-less deposit from a linked wallet address', async () => {
     const ctx = await freshApp();
-    ctx.db
-      .prepare("INSERT INTO user_wallets VALUES ('u-rohan', ?, 'stellar', 'manual', ?)")
-      .run(STELLAR_ADDR, new Date().toISOString());
+    await ctx.stdb.call((r) =>
+      r.linkWallet({ userId: 'u-rohan', address: STELLAR_ADDR, chainType: 'stellar', source: 'manual' }),
+    );
 
-    const pool = ctx.db.prepare('SELECT account FROM pool').get() as { account: string };
+    const pool = [...ctx.stdb.db.pool.iter()][0]!;
     const fakeHorizon = (async () =>
       new Response(
         JSON.stringify({
@@ -266,7 +256,7 @@ describe('Deposit attribution by linked wallet', () => {
         { status: 200 },
       )) as typeof fetch;
 
-    const result = await syncDeposits(ctx.db, fakeHorizon);
+    const result = await syncDeposits(ctx.stdb, fakeHorizon);
     expect(result.credited).toBe(1);
     const overview = (await ctx.app.inject({ url: '/api/overview', headers: OWNER })).json();
     expect(overview.balances.personal).toBe(96410 + 25 * 88);
@@ -285,13 +275,13 @@ describe('Sensitive card details', () => {
     expect(unlinked.json().available).toBe(false);
 
     // Linked → provider details, and the view is audited
-    ctx.db.prepare("UPDATE cards SET provider_card_id='mock-9' WHERE id='c-maya'").run();
+    await ctx.stdb.call((r) => r.devLinkCardProvider({ cardId: 'c-maya', providerCardId: 'mock-9' }));
     const linked = await ctx.app.inject({ url: '/api/cards/c-maya/sensitive', headers: { ...OWNER, ...STEP_UP } });
     expect(linked.json().cardNumber).toBe('4242 4242 4242 4242');
-    const audited = ctx.db
-      .prepare("SELECT count(*) AS c FROM audit_events WHERE title LIKE 'Card details viewed%'")
-      .get() as { c: number };
-    expect(audited.c).toBe(1);
+    const audited = [...ctx.stdb.db.auditEvents.iter()].filter((e) =>
+      e.title.startsWith('Card details viewed'),
+    );
+    expect(audited).toHaveLength(1);
 
     // Another member's card is out of scope for a teen
     const teenOther = await ctx.app.inject({ url: '/api/cards/c-dad/sensitive', headers: { 'x-user-id': 'u-maya', ...STEP_UP } });

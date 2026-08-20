@@ -5,7 +5,7 @@
 // here — prepared actions return to the client, which confirms through
 // the /api/actions execution gateway.
 
-import type { DB } from '../db.js';
+import type { Stdb } from '../stdb/client.js';
 import type { PreparedAction, Session } from '../types.js';
 import { qwenConfigFromEnv, runQwenTurn, type QwenConfig } from './qwen.js';
 import { interpretScripted } from './scripted.js';
@@ -43,7 +43,7 @@ function systemPrompt(session: Session, contextMemberId?: string): string {
 }
 
 export async function runAgentTurn(
-  db: DB,
+  stdb: Stdb,
   session: Session,
   messages: ChatMessage[],
   contextMemberId?: string,
@@ -53,11 +53,11 @@ export async function runAgentTurn(
   const lastUser = [...messages].reverse().find((m) => m.role === 'user');
 
   if (process.env.AGENT_MODE === 'scripted' || !cfg) {
-    const result = interpretScripted(db, session, lastUser?.content ?? '');
+    const result = await interpretScripted(stdb, session, lastUser?.content ?? '');
     return { mode: 'scripted', text: result.text, prepared: result.prepared };
   }
 
-  const ctx: AgentContext = { db, session, prepared: [] };
+  const ctx: AgentContext = { stdb, session, prepared: [] };
   try {
     const text = await runQwenTurn(cfg, systemPrompt(session, contextMemberId), messages, buildTools(ctx));
     return { mode: 'llm', text, prepared: ctx.prepared };
@@ -67,9 +67,11 @@ export async function runAgentTurn(
     // Anything the failed turn prepared is cancelled so it can't be
     // duplicated or confirmed from a half-finished conversation.
     for (const a of ctx.prepared) {
-      db.prepare("UPDATE prepared_actions SET status='cancelled' WHERE id=? AND status='prepared'").run(a.id);
+      await stdb
+        .call((r) => r.cancelAction({ actionId: a.id, userId: session.userId }))
+        .catch(() => undefined);
     }
-    const result = interpretScripted(db, session, lastUser?.content ?? '');
+    const result = await interpretScripted(stdb, session, lastUser?.content ?? '');
     return { mode: 'scripted', degraded: true, text: result.text, prepared: result.prepared };
   }
 }

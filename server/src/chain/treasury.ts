@@ -20,9 +20,9 @@ import {
   type Transaction,
 } from '@stellar/stellar-sdk';
 
-import { appendAudit } from '../audit.js';
 import type { AppConfig } from '../config.js';
-import type { DB } from '../db.js';
+import type { Stdb } from '../stdb/client.js';
+import { mapWithdrawal } from '../stdb/rows.js';
 import { getPool } from '../services/readModel.js';
 
 const HORIZON = () => process.env.STELLAR_HORIZON_URL ?? 'https://horizon-testnet.stellar.org';
@@ -118,12 +118,12 @@ export async function sendPayment(
  * native XLM; a USDC trustline is a later step.
  */
 export async function bootstrapPool(
-  db: DB,
+  stdb: Stdb,
   client: PrivyClient,
   opts: { rateInrPerUnit?: number } = {},
   fetchFn: typeof fetch = fetch,
 ): Promise<{ address: string; walletId: string }> {
-  const existing = getPool(db) as { privy_wallet_id?: string | null; account: string };
+  const existing = getPool(stdb);
   if (existing.privy_wallet_id) {
     return { address: existing.account, walletId: existing.privy_wallet_id };
   }
@@ -136,15 +136,13 @@ export async function bootstrapPool(
   const fb = await fetchFn(`https://friendbot.stellar.org/?addr=${wallet.address}`);
   if (!fb.ok) throw new Error(`friendbot funding failed (${fb.status})`);
 
-  db.prepare(
-    "UPDATE pool SET account=?, privy_wallet_id=?, network='testnet', asset_code='XLM', asset_issuer=NULL, rate_inr_per_unit=?",
-  ).run(wallet.address, wallet.id, opts.rateInrPerUnit ?? 30);
-  appendAudit(db, {
-    kind: 'security_event',
-    title: 'Stellar pool wallet created',
-    subtitle: `${wallet.address} · Privy server wallet`,
-    actor: 'treasury',
-  });
+  await stdb.call((r) =>
+    r.bootstrapPoolWallet({
+      account: wallet.address,
+      privyWalletId: wallet.id,
+      rateInrPerUnit: opts.rateInrPerUnit ?? 30,
+    }),
+  );
   return { address: wallet.address, walletId: wallet.id };
 }
 
@@ -155,20 +153,19 @@ export async function bootstrapPool(
  * balance at EXECUTE; a failed payout is surfaced for manual review).
  */
 export async function processWithdrawals(
-  db: DB,
+  stdb: Stdb,
   client: PrivyClient,
   fetchFn: typeof fetch = fetch,
 ): Promise<{ sent: number; failed: number }> {
-  const pool = getPool(db) as ReturnType<typeof getPool> & { privy_wallet_id?: string | null };
+  const pool = getPool(stdb);
   if (!pool.privy_wallet_id) return { sent: 0, failed: 0 };
   const signer = privySigner(client, pool.privy_wallet_id, pool.account);
 
-  const queued = db.prepare("SELECT * FROM withdrawals WHERE status='queued' ORDER BY at ASC LIMIT 5").all() as {
-    id: string;
-    to_address: string;
-    amount_units: number;
-    amount_inr: number;
-  }[];
+  const queued = [...stdb.db.withdrawals.iter()]
+    .map(mapWithdrawal)
+    .filter((w) => w.status === 'queued')
+    .sort((a, b) => (a.at > b.at ? 1 : -1))
+    .slice(0, 5);
 
   let sent = 0;
   let failed = 0;
@@ -183,26 +180,12 @@ export async function processWithdrawals(
         },
         fetchFn,
       );
-      db.prepare("UPDATE withdrawals SET status='sent', tx_hash=? WHERE id=?").run(hash, w.id);
-      appendAudit(db, {
-        kind: 'transfer',
-        title: `Withdrawal sent on-chain — ₹${w.amount_inr.toLocaleString('en-IN')}`,
-        subtitle: `tx ${hash.slice(0, 10)}… · ${w.amount_units.toFixed(2)} ${pool.asset_code}`,
-        amount: w.amount_inr,
-        actor: 'treasury',
-      });
+      await stdb.call((r) => r.withdrawalMarkSent({ id: w.id, txHash: hash }));
       sent += 1;
     } catch (e) {
-      db.prepare("UPDATE withdrawals SET status='failed', error=? WHERE id=?").run(
-        String((e as Error).message).slice(0, 300),
-        w.id,
+      await stdb.call((r) =>
+        r.withdrawalMarkFailed({ id: w.id, error: String((e as Error).message).slice(0, 300) }),
       );
-      appendAudit(db, {
-        kind: 'security_event',
-        title: `Withdrawal payout failed — needs review`,
-        subtitle: String((e as Error).message).slice(0, 120),
-        actor: 'treasury',
-      });
       failed += 1;
     }
   }

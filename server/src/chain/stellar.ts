@@ -11,13 +11,15 @@
 //
 // Uses Horizon's public REST API directly (testnet by default). The
 // fetch function is injectable so tests run against a fake Horizon.
+// Attribution decisions happen here against the live cache; each
+// accepted payment is recorded through one reducer so its deposit row,
+// pool movement, balance credit, transaction, and audit land atomically.
 
 import { randomUUID } from 'node:crypto';
 
-import { appendAudit } from '../audit.js';
-import type { DB } from '../db.js';
+import type { Stdb } from '../stdb/client.js';
+import { mapDeposit, mapUser } from '../stdb/rows.js';
 import { DomainError, type Session } from '../types.js';
-import { applyOrderPayment } from '../services/cardOrders.js';
 import { getPool } from '../services/readModel.js';
 
 const HORIZON_URL = process.env.STELLAR_HORIZON_URL ?? 'https://horizon-testnet.stellar.org';
@@ -48,18 +50,16 @@ export interface DepositIntent {
 }
 
 /** What the user needs to make a deposit: pool address + their memo. */
-export function getDepositIntent(db: DB, session: Session): DepositIntent {
-  const pool = getPool(db);
-  const memo = db.prepare('SELECT deposit_memo FROM users WHERE id = ?').get(session.userId) as
-    | { deposit_memo: string | null }
-    | undefined;
-  if (!memo?.deposit_memo) {
+export function getDepositIntent(stdb: Stdb, session: Session): DepositIntent {
+  const pool = getPool(stdb);
+  const user = stdb.db.users.id.find(session.userId);
+  if (!user?.depositMemo) {
     throw new DomainError('invalid_request', 'No deposit memo is set for this account.');
   }
   return {
     network: pool.network,
     address: pool.account,
-    memo: memo.deposit_memo,
+    memo: user.depositMemo,
     memoType: 'text',
     asset: pool.asset_code,
     assetIssuer: pool.asset_issuer,
@@ -71,17 +71,15 @@ export function getDepositIntent(db: DB, session: Session): DepositIntent {
 /**
  * Poll Horizon for new incoming payments to the pool account and credit
  * matched users. Cursor-persistent and idempotent: an operation id is
- * credited at most once even if polling overlaps.
+ * credited at most once even if polling overlaps (the reducer enforces
+ * op-id uniqueness transactionally).
  */
 export async function syncDeposits(
-  db: DB,
+  stdb: Stdb,
   fetchFn: typeof fetch = fetch,
 ): Promise<{ credited: number; unattributed: number; orderPayments: number; checked: number }> {
-  const pool = getPool(db);
-  const cursorRow = db.prepare("SELECT v FROM sync_state WHERE k='horizon_cursor'").get() as
-    | { v: string }
-    | undefined;
-  const cursor = cursorRow?.v ?? '';
+  const pool = getPool(stdb);
+  const cursor = stdb.db.syncState.k.find('horizon_cursor')?.v ?? '';
 
   const url =
     `${HORIZON_URL}/accounts/${pool.account}/payments` +
@@ -111,29 +109,36 @@ export async function syncDeposits(
     const issuerOk = isNative || !pool.asset_issuer || p.asset_issuer === pool.asset_issuer;
     if (code !== pool.asset_code || !issuerOk) continue;
 
-    const already = db.prepare('SELECT 1 FROM deposits WHERE op_id = ?').get(p.id);
-    if (already) continue;
+    // Unique-column accessors expose find() at runtime (typings lag).
+    const seen = (stdb.db.deposits.opId as unknown as { find(v: string): unknown }).find(p.id);
+    if (seen) continue;
 
     const amountUnits = Number(p.amount ?? 0);
     if (!(amountUnits > 0)) continue;
 
-    const memo = p.transaction?.memo ?? null;
+    const memo = p.transaction?.memo ?? undefined;
+    const at = p.created_at ?? new Date().toISOString();
 
     // Card-order payments (ORD-… memos) belong to the order, not the
     // general balance: record the deposit, grow the crypto reserve, and
     // mark the order paid for admin review.
     if (memo) {
-      const order = db
-        .prepare("SELECT id, user_id FROM card_orders WHERE memo=? AND status='awaiting_payment'")
-        .get(memo) as { id: string; user_id: string } | undefined;
+      const order = [...stdb.db.cardOrders.iter()].find(
+        (o) => o.memo === memo && o.status === 'awaiting_payment',
+      );
       if (order) {
-        const amountUnits = Number(p.amount ?? 0);
-        const depositId = `dep-${randomUUID()}`;
-        db.prepare(
-          "INSERT INTO deposits (id,tx_hash,op_id,from_address,asset_code,amount_units,credited_inr,memo,user_id,status,at) VALUES (?,?,?,?,?,?,0,?,?,'order_payment',?)",
-        ).run(depositId, p.transaction_hash, p.id, p.from ?? '', code!, amountUnits, memo, order.user_id, p.created_at ?? new Date().toISOString());
-        db.prepare('UPDATE pool SET crypto_reserve_units = crypto_reserve_units + ?').run(amountUnits);
-        applyOrderPayment(db, memo, depositId, amountUnits);
+        await stdb.call((r) =>
+          r.recordOrderPayment({
+            depositId: `dep-${randomUUID()}`,
+            txHash: p.transaction_hash,
+            opId: p.id,
+            fromAddress: p.from ?? '',
+            assetCode: code!,
+            amountUnits,
+            memo,
+            at,
+          }),
+        );
         orderPayments += 1;
         continue;
       }
@@ -142,84 +147,73 @@ export async function syncDeposits(
     // Attribution: memo first (authoritative), then a linked wallet
     // address (synced from Privy or registered manually).
     let user = memo
-      ? (db.prepare('SELECT id, name, member_id, role FROM users WHERE deposit_memo = ?').get(memo) as
-          | { id: string; name: string; member_id: string; role: string }
-          | undefined)
+      ? [...stdb.db.users.iter()].find((u) => u.depositMemo === memo)
       : undefined;
     if (!user && p.from) {
-      user = db
-        .prepare(
-          'SELECT u.id, u.name, u.member_id, u.role FROM user_wallets w JOIN users u ON u.id = w.user_id WHERE w.address = ?',
-        )
-        .get(p.from) as typeof user;
+      const wallet = [...stdb.db.userWallets.address.filter(p.from)][0];
+      if (wallet) user = stdb.db.users.id.find(wallet.userId) ?? undefined;
     }
 
     const creditedInr = Math.floor(amountUnits * pool.rate_inr_per_unit);
-    const at = p.created_at ?? new Date().toISOString();
 
     if (!user) {
       // Unattributed: hold it, never guess an owner (spec: money state is never ambiguous).
-      db.prepare(
-        "INSERT INTO deposits VALUES (?,?,?,?,?,?,?,?,NULL,'unattributed',?)",
-      ).run(`dep-${randomUUID()}`, p.transaction_hash, p.id, p.from ?? '', code!, amountUnits, creditedInr, memo, at);
+      await stdb.call((r) =>
+        r.recordDeposit({
+          id: `dep-${randomUUID()}`,
+          txHash: p.transaction_hash,
+          opId: p.id,
+          fromAddress: p.from ?? '',
+          assetCode: code!,
+          amountUnits,
+          creditedInr,
+          memo,
+          userId: undefined,
+          memberId: undefined,
+          scope: undefined,
+          at,
+          credited: false,
+        }),
+      );
       unattributed += 1;
       continue;
     }
 
     // Credit: pool converts crypto → INR spending balance.
-    db.prepare("INSERT INTO deposits VALUES (?,?,?,?,?,?,?,?,?,'credited',?)").run(
-      `dep-${randomUUID()}`,
-      p.transaction_hash,
-      p.id,
-      p.from ?? '',
-      code!,
-      amountUnits,
-      creditedInr,
-      memo,
-      user.id,
-      at,
+    const u = mapUser(user);
+    const scope = u.role === 'owner' || u.role === 'admin' ? 'personal' : 'family';
+    await stdb.call((r) =>
+      r.recordDeposit({
+        id: `dep-${randomUUID()}`,
+        txHash: p.transaction_hash,
+        opId: p.id,
+        fromAddress: p.from ?? '',
+        assetCode: code!,
+        amountUnits,
+        creditedInr,
+        memo,
+        userId: u.id,
+        memberId: u.member_id,
+        scope,
+        at,
+        credited: true,
+      }),
     );
-    db.prepare('UPDATE pool SET crypto_reserve_units = crypto_reserve_units + ?, fiat_float_inr = fiat_float_inr - ?').run(
-      amountUnits,
-      creditedInr,
-    );
-    const scope = user.role === 'owner' || user.role === 'admin' ? 'personal' : 'family';
-    db.prepare('UPDATE balances SET amount = amount + ? WHERE scope = ?').run(creditedInr, scope);
-    db.prepare(
-      'INSERT INTO transactions (id,merchant,member_id,card_id,amount,direction,category,status,at) VALUES (?,?,?,?,?,?,?,?,?)',
-    ).run(
-      `t-dep-${p.id}`,
-      `Stellar deposit · ${amountUnits} ${code}`,
-      user.member_id,
-      'c-personal',
-      creditedInr,
-      'credit',
-      'Deposit',
-      'settled',
-      at,
-    );
-    appendAudit(db, {
-      kind: 'transfer',
-      title: `Deposit credited — ${creditedInr.toLocaleString('en-IN')} INR`,
-      subtitle: `${amountUnits} ${code} on Stellar · memo ${memo}`,
-      amount: creditedInr,
-      memberId: user.member_id,
-      actor: 'stellar-rail',
-    });
     credited += 1;
   }
 
   if (lastCursor !== cursor) {
-    db.prepare(
-      "INSERT INTO sync_state (k,v) VALUES ('horizon_cursor', ?) ON CONFLICT(k) DO UPDATE SET v=excluded.v",
-    ).run(lastCursor);
+    await stdb.call((r) => r.setSyncCursor({ v: lastCursor }));
   }
 
   return { credited, unattributed, orderPayments, checked: records.length };
 }
 
-export function listDeposits(db: DB, session: Session) {
-  const rows = db.prepare('SELECT * FROM deposits ORDER BY at DESC LIMIT 50').all() as any[];
+export function listDeposits(stdb: Stdb, session: Session) {
+  const rows = [...stdb.db.deposits.iter()]
+    .map(mapDeposit)
+    .sort((a, b) => (a.at < b.at ? 1 : -1))
+    .slice(0, 50);
   if (session.role === 'owner' || session.role === 'admin') return rows;
   return rows.filter((d) => d.user_id === session.userId);
 }

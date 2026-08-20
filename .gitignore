@@ -44,3 +44,6 @@ example
 
 # notebook checkpoints
 .ipynb_checkpoints/
+
+# SpacetimeDB local data
+.spacetimedb-data/

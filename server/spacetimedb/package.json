@@ -1,0 +1,16 @@
+{
+  "name": "fastcards-module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FastCards SpacetimeDB module — system of record for all domain state",
+  "scripts": {
+    "build": "spacetime build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "spacetimedb": "2.8.*"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.2"
+  }
+}

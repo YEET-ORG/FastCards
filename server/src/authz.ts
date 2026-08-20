@@ -9,20 +9,10 @@
 // Dev mode (no Privy, never in production): the x-user-id header selects
 // a seeded session, exactly like before.
 
-import { appendAudit } from './audit.js';
 import type { AuthVerifier } from './auth/privy.js';
-import type { DB } from './db.js';
+import type { Stdb } from './stdb/client.js';
+import { mapUser, type UserRowShape } from './stdb/rows.js';
 import { DomainError, type Session } from './types.js';
-
-interface UserRow {
-  id: string;
-  name: string;
-  role: Session['role'];
-  member_id: string;
-  privy_did: string | null;
-  kyc_status: Session['kycStatus'];
-  is_admin: number;
-}
 
 export interface AuthContext {
   verifier: AuthVerifier | null;
@@ -30,7 +20,7 @@ export interface AuthContext {
 }
 
 export async function resolveSession(
-  db: DB,
+  stdb: Stdb,
   auth: AuthContext,
   headers: { authorization?: string; 'x-user-id'?: string; 'privy-id-token'?: string },
 ): Promise<Session> {
@@ -39,21 +29,19 @@ export async function resolveSession(
     : undefined;
 
   if (auth.verifier && bearer) {
-    return resolvePrivySession(db, auth.verifier, bearer, headers['privy-id-token']);
+    return resolvePrivySession(stdb, auth.verifier, bearer, headers['privy-id-token']);
   }
   if (auth.devAuthAllowed) {
     const userId = headers['x-user-id'] ?? 'u-rohan';
-    const row = db.prepare('SELECT id, name, role, member_id, privy_did, kyc_status, is_admin FROM users WHERE id = ?').get(userId) as
-      | UserRow
-      | undefined;
-    if (!row) throw new DomainError('permission_denied', 'Unknown user.');
-    return sessionFrom(row);
+    const raw = stdb.db.users.id.find(userId);
+    if (!raw) throw new DomainError('permission_denied', 'Unknown user.');
+    return sessionFrom(mapUser(raw));
   }
   throw new DomainError('step_up_required', 'Sign in to continue.');
 }
 
 async function resolvePrivySession(
-  db: DB,
+  stdb: Stdb,
   verifier: AuthVerifier,
   token: string,
   idToken?: string,
@@ -65,23 +53,15 @@ async function resolvePrivySession(
     throw new DomainError('step_up_required', 'Your session has expired. Sign in again.');
   }
 
-  let row = db.prepare('SELECT id, name, role, member_id, privy_did, kyc_status, is_admin FROM users WHERE privy_did = ?').get(did) as
-    | UserRow
-    | undefined;
+  let row = [...stdb.db.users.iter()].map(mapUser).find((u) => u.privy_did === did);
 
   if (!row) {
     // Bootstrap: the first Privy identity claims the seeded owner account.
-    const ownerUnbound = db
-      .prepare("SELECT id, name, role, member_id, privy_did, kyc_status, is_admin FROM users WHERE role='owner' AND privy_did IS NULL")
-      .get() as UserRow | undefined;
+    const ownerUnbound = [...stdb.db.users.iter()]
+      .map(mapUser)
+      .find((u) => u.role === 'owner' && u.privy_did === null);
     if (ownerUnbound) {
-      db.prepare('UPDATE users SET privy_did = ? WHERE id = ?').run(did, ownerUnbound.id);
-      appendAudit(db, {
-        kind: 'security_event',
-        title: 'Owner account linked to Privy',
-        subtitle: did,
-        actor: ownerUnbound.name,
-      });
+      await stdb.call((r) => r.bindPrivyDid({ userId: ownerUnbound.id, did }));
       row = { ...ownerUnbound, privy_did: did };
     } else {
       throw new DomainError(
@@ -91,34 +71,33 @@ async function resolvePrivySession(
     }
   }
 
-  await syncWallets(db, verifier, row.id, did, idToken);
+  await syncWallets(stdb, verifier, row.id, did, idToken);
   return sessionFrom(row);
 }
 
 /** Best-effort sync of Privy linked wallets → user_wallets (for deposit attribution). */
 async function syncWallets(
-  db: DB,
+  stdb: Stdb,
   verifier: AuthVerifier,
   userId: string,
   did: string,
   idToken?: string,
 ): Promise<void> {
   const wallets = await verifier.getWallets(did, idToken);
-  const insert = db.prepare(
-    'INSERT INTO user_wallets (user_id, address, chain_type, source, linked_at) VALUES (?,?,?,?,?) ON CONFLICT(user_id, address) DO NOTHING',
-  );
   for (const w of wallets) {
-    insert.run(userId, w.address, w.chainType, 'privy', new Date().toISOString());
+    await stdb.call((r) =>
+      r.linkWallet({ userId, address: w.address, chainType: w.chainType, source: 'privy' }),
+    );
   }
 }
 
-function sessionFrom(row: UserRow): Session {
+function sessionFrom(row: UserRowShape): Session {
   return {
     userId: row.id,
     name: row.name,
     memberId: row.member_id,
-    role: row.role,
-    kycStatus: row.kyc_status,
+    role: row.role as Session['role'],
+    kycStatus: row.kyc_status as Session['kycStatus'],
     isAdmin: row.is_admin === 1,
   };
 }

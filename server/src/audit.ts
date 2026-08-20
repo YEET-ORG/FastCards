@@ -1,12 +1,15 @@
 // Append-only audit ledger (spec §4.4, §82 rule 6): every money
 // movement, rule change, card action, approval, deposit, and AI-mediated
-// change lands here.
+// change lands here. Most mutations write their audit row atomically
+// inside their reducer; this helper covers standalone events (security
+// views, treasury bookkeeping).
 
-import type { DB } from './db.js';
+import type { Stdb } from './stdb/client.js';
+import { mapAudit } from './stdb/rows.js';
 import type { AuditRow } from './types.js';
 
-export function appendAudit(
-  db: DB,
+export async function appendAudit(
+  stdb: Stdb,
   event: {
     kind: AuditRow['kind'];
     title: string;
@@ -15,22 +18,22 @@ export function appendAudit(
     memberId?: string;
     actor: string;
   },
-): void {
-  db.prepare(
-    'INSERT INTO audit_events (kind,title,subtitle,amount,member_id,actor,at) VALUES (?,?,?,?,?,?,?)',
-  ).run(
-    event.kind,
-    event.title,
-    event.subtitle ?? null,
-    event.amount ?? null,
-    event.memberId ?? null,
-    event.actor,
-    new Date().toISOString(),
+): Promise<void> {
+  await stdb.call((r) =>
+    r.appendAudit({
+      kind: event.kind,
+      title: event.title,
+      subtitle: event.subtitle,
+      amount: event.amount,
+      memberId: event.memberId,
+      actor: event.actor,
+    }),
   );
 }
 
-export function listAudit(db: DB, limit = 100): AuditRow[] {
-  return db
-    .prepare('SELECT * FROM audit_events ORDER BY at DESC, id DESC LIMIT ?')
-    .all(limit) as unknown as AuditRow[];
+export function listAudit(stdb: Stdb, limit = 100): AuditRow[] {
+  return [...stdb.db.auditEvents.iter()]
+    .sort((a, b) => (a.at === b.at ? Number(b.id - a.id) : a.at < b.at ? 1 : -1))
+    .slice(0, limit)
+    .map(mapAudit);
 }

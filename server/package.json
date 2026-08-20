@@ -10,8 +10,12 @@
     "test": "vitest run",
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
+    "start:maincloud": "STDB_URI=wss://maincloud.spacetimedb.com STDB_DB=fastcards-357rw tsx src/server.ts",
     "typecheck": "tsc --noEmit",
-    "dev:qwen": "QWEN_BASE_URL=http://127.0.0.1:6402/v1 QWEN_MODEL=qwen3.8-27b tsx watch src/server.ts"
+    "dev:qwen": "QWEN_BASE_URL=http://127.0.0.1:6402/v1 QWEN_MODEL=qwen3.8-27b tsx watch src/server.ts",
+    "stdb:publish:local": "spacetime publish fastcards --server local --yes",
+    "stdb:publish:maincloud": "spacetime publish fastcards-357rw --server maincloud --yes",
+    "stdb:generate": "spacetime generate --lang typescript --out-dir src/stdb/bindings --module-path ./spacetimedb --include-private --yes && node scripts/fix-bindings.mjs"
   },
   "keywords": [],
   "author": "",
@@ -25,6 +29,7 @@
     "@stellar/stellar-sdk": "^16.2.0",
     "fastify": "^5.12.1",
     "jose": "^6.2.9",
+    "spacetimedb": "^2.8.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {

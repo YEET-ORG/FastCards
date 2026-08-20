@@ -8,11 +8,11 @@ import { createProvider, type CardProvider } from './cards/provider.js';
 import { syncDeposits } from './chain/stellar.js';
 import { privyClientFromConfig, processWithdrawals } from './chain/treasury.js';
 import { loadConfig, type AppConfig } from './config.js';
-import { openDb, seed, type DB } from './db.js';
 import { registerRoutes } from './routes.js';
+import { connectStdb, type Stdb } from './stdb/client.js';
 
 export interface BuildOptions {
-  db?: DB;
+  stdb?: Stdb;
   provider?: CardProvider;
   verifier?: AuthVerifier | null;
   config?: AppConfig;
@@ -20,8 +20,9 @@ export interface BuildOptions {
 
 export async function buildApp(opts: BuildOptions = {}) {
   const config = opts.config ?? loadConfig();
-  const database = opts.db ?? openDb(config.FASTCARDS_DB);
-  seed(database);
+  const stdb =
+    opts.stdb ??
+    (await connectStdb({ uri: config.STDB_URI, dbName: config.STDB_DB, token: config.STDB_TOKEN }));
   const cardProvider = opts.provider ?? createProvider();
   const verifier = opts.verifier !== undefined ? opts.verifier : createVerifier(config);
 
@@ -50,33 +51,34 @@ export async function buildApp(opts: BuildOptions = {}) {
   const privyApi = privyClientFromConfig(config);
   registerRoutes(
     app,
-    database,
+    stdb,
     cardProvider,
     { verifier, devAuthAllowed: config.devAuthAllowed },
     privyApi,
   );
 
-  return { app, db: database, provider: cardProvider, config, privyApi };
+  return { app, stdb, provider: cardProvider, config, privyApi };
 }
 
 const isMain = process.argv[1]?.endsWith('server.ts') || process.argv[1]?.endsWith('server.js');
 if (isMain) {
-  const { app, db, config, privyApi } = await buildApp();
+  const { app, stdb, config, privyApi } = await buildApp();
 
   // Poll the Stellar rail: ingest deposits and pay out queued
   // withdrawals. Failures are logged, never fatal.
   if (config.STELLAR_POLL_MS > 0) {
     setInterval(() => {
-      syncDeposits(db).catch((e) => app.log.warn({ err: (e as Error).message }, 'stellar sync failed'));
+      syncDeposits(stdb).catch((e) => app.log.warn({ err: (e as Error).message }, 'stellar sync failed'));
       if (privyApi) {
-        processWithdrawals(db, privyApi).catch((e) =>
+        processWithdrawals(stdb, privyApi).catch((e) =>
           app.log.warn({ err: (e as Error).message }, 'withdrawal processing failed'),
         );
       }
     }, config.STELLAR_POLL_MS).unref();
   }
 
-  // Graceful shutdown: stop accepting connections, flush, close the DB.
+  // Graceful shutdown: stop accepting connections, flush, close the
+  // SpacetimeDB connection.
   let shuttingDown = false;
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
@@ -84,7 +86,7 @@ if (isMain) {
     app.log.info({ signal }, 'shutting down');
     try {
       await app.close();
-      db.close();
+      stdb.disconnect();
     } finally {
       process.exit(0);
     }
@@ -95,7 +97,12 @@ if (isMain) {
   try {
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
     app.log.info(
-      { port: config.PORT, auth: config.privyEnabled ? 'privy' : 'dev', agent: config.QWEN_BASE_URL ? 'qwen' : 'scripted' },
+      {
+        port: config.PORT,
+        stdb: `${config.STDB_URI}/${config.STDB_DB}`,
+        auth: config.privyEnabled ? 'privy' : 'dev',
+        agent: config.QWEN_BASE_URL ? 'qwen' : 'scripted',
+      },
       'fastcards-server up',
     );
   } catch (err) {

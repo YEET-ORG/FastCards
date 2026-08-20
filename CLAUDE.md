@@ -168,3 +168,11 @@ If the answer to any of these is no, the feature is not complete.
 - Reacticx components live in `src/shared/ui` (config: `component.config.json`).
 - Verify with `npx tsc --noEmit` and `npx expo export --platform ios` (bundle check).
 - Template docs: `AGENTS.md` (Expo starter notes).
+
+### Backend / SpacetimeDB
+
+- **SpacetimeDB is the system of record.** The module (tables + reducers) lives in `server/spacetimedb/`; every domain mutation is a reducer that re-validates its invariants transactionally and writes the audit row atomically. All tables are private — only the gateway identity can subscribe or call reducers (`module_config.owner`, set at init).
+- The Node service (`server/`) is the integration gateway: Privy auth, Horizon polling, KripiCard, Qwen — things reducers can't do (no HTTP). It connects as a SpacetimeDB client (`src/stdb/client.ts`), reads from the live subscription cache, and mutates only through reducers. Reducer errors use `code|message` and map onto `DomainError`.
+- Databases: local dev `fastcards` (ws://127.0.0.1:3000, start with `spacetime start`), production maincloud `fastcards-357rw` (identity `c200e31c…`). `npm run stdb:publish:local` / `stdb:publish:maincloud`; after schema changes run `npm run stdb:generate` to refresh `src/stdb/bindings`.
+- Tests (`npm test`) auto-start a local SpacetimeDB if needed, publish `fastcards-test` fresh, and reset it per test via the gateway-gated `dev_reset` reducer. Test files must not run in parallel (shared DB — enforced in `vitest.config.ts`).
+- KripiCard uses the real external API (base `https://appapi.kripicard.com`, docs https://www.kripicard.com/api-docs). Treat HTTP 202 `pending:true` as terminal — never auto-retry (double-charge risk); `code: REFUND_PENDING` means the wallet is still charged. Secrets live only in gitignored `server/.env`.

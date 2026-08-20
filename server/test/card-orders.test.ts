@@ -3,25 +3,12 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { MockCardProvider } from '../src/cards/provider.js';
 import { syncDeposits } from '../src/chain/stellar.js';
-import { openDb, seed } from '../src/db.js';
-import { buildApp } from '../src/server.js';
-
-process.env.NODE_ENV = 'test';
-process.env.AGENT_MODE = 'scripted';
+import { freshApp } from './helpers.js';
 
 const ADMIN = { 'x-user-id': 'u-rohan' }; // seeded platform admin
 const MAYA = { 'x-user-id': 'u-maya' }; // kyc_status 'none' in seed
 const STEP_UP = { 'x-auth-assertion': 'passkey-mock-ok' };
-
-async function freshApp() {
-  const db = openDb(':memory:');
-  seed(db);
-  const provider = new MockCardProvider();
-  const { app } = await buildApp({ db, provider, verifier: null });
-  return { app, db, provider };
-}
 
 let ctx: Awaited<ReturnType<typeof freshApp>>;
 beforeEach(async () => {
@@ -29,7 +16,7 @@ beforeEach(async () => {
 });
 
 function fakeHorizonPayment(memo: string, amount: string) {
-  const pool = ctx.db.prepare('SELECT account FROM pool').get() as { account: string };
+  const pool = [...ctx.stdb.db.pool.iter()][0]!;
   const record = {
     id: `op-${memo}-${amount}`,
     type: 'payment',
@@ -144,7 +131,7 @@ describe('Order → payment → admin approval', () => {
 
     // Payment arrives on-chain with the order memo — no balance credit.
     const before = (await ctx.app.inject({ url: '/api/overview', headers: ADMIN })).json();
-    const sync = await syncDeposits(ctx.db, fakeHorizonPayment(order.payment.memo, String(order.payment.amountUnits)));
+    const sync = await syncDeposits(ctx.stdb, fakeHorizonPayment(order.payment.memo, String(order.payment.amountUnits)));
     expect(sync.orderPayments).toBe(1);
     const after = (await ctx.app.inject({ url: '/api/overview', headers: ADMIN })).json();
     expect(after.balances).toEqual(before.balances);
@@ -163,9 +150,9 @@ describe('Order → payment → admin approval', () => {
     expect(approve.statusCode).toBe(200);
     const { cardId } = approve.json();
 
-    const card = ctx.db.prepare('SELECT * FROM cards WHERE id=?').get(cardId) as any;
-    expect(card.member_id).toBe('m-maya');
-    expect(card.provider_card_id).toMatch(/^mock-card-/);
+    const card = ctx.stdb.db.cards.id.find(cardId);
+    expect(card?.memberId).toBe('m-maya');
+    expect(card?.providerCardId).toMatch(/^mock-card-/);
 
     const poolAfter = (await ctx.app.inject({ url: '/api/admin/provider-pool', headers: ADMIN })).json();
     expect(poolAfter.balance_usd).toBe(floatBefore - order.priceUsd);
@@ -188,7 +175,7 @@ describe('Order → payment → admin approval', () => {
 
   it('blocks approval when the provider pool cannot cover the card', async () => {
     const order = await placeOrder();
-    await syncDeposits(ctx.db, fakeHorizonPayment(order.payment.memo, String(order.payment.amountUnits)));
+    await syncDeposits(ctx.stdb, fakeHorizonPayment(order.payment.memo, String(order.payment.amountUnits)));
     await ctx.app.inject({
       method: 'POST',
       url: '/api/admin/provider-pool',
@@ -208,7 +195,7 @@ describe('Order → payment → admin approval', () => {
 
   it('underpaid orders stay unapprovable', async () => {
     const order = await placeOrder();
-    await syncDeposits(ctx.db, fakeHorizonPayment(order.payment.memo, '1'));
+    await syncDeposits(ctx.stdb, fakeHorizonPayment(order.payment.memo, '1'));
     const res = await ctx.app.inject({
       method: 'POST',
       url: `/api/admin/orders/${order.orderId}/approve`,
@@ -220,7 +207,7 @@ describe('Order → payment → admin approval', () => {
 
   it('reject flags a refund when payment had landed', async () => {
     const order = await placeOrder();
-    await syncDeposits(ctx.db, fakeHorizonPayment(order.payment.memo, String(order.payment.amountUnits)));
+    await syncDeposits(ctx.stdb, fakeHorizonPayment(order.payment.memo, String(order.payment.amountUnits)));
     const res = await ctx.app.inject({
       method: 'POST',
       url: `/api/admin/orders/${order.orderId}/reject`,

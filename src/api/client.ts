@@ -201,6 +201,13 @@ export interface Receipt {
 export const api = {
   request,
 
+  /** Resolve the caller's server-side session (Privy bearer or dev header). */
+  fetchSession: (headers: AuthHeaders) =>
+    request<{ userId: string; name: string; role: string; isAdmin: boolean; kycStatus: string }>(
+      '/api/session',
+      headers,
+    ),
+
   async fetchDomainState(headers: AuthHeaders): Promise<DomainState> {
     const [overview, members, cards, approvals, activity] = await Promise.all([
       request<any>('/api/overview', headers),

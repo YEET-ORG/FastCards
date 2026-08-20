@@ -3,3 +3,5 @@ node_modules/
 fastcards.db
 fastcards.db-wal
 fastcards.db-shm
+.spacetimedb-test-data/
+spacetimedb/node_modules/

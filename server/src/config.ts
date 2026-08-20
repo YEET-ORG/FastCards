@@ -26,10 +26,29 @@ function loadDotEnv(path = '.env'): void {
 
 loadDotEnv();
 
+/** The spacetime CLI stores the logged-in identity's token in cli.toml —
+ * reuse it so the gateway connects as the database owner in dev. */
+function spacetimeCliToken(): string | undefined {
+  try {
+    const home = process.env.HOME ?? '';
+    const raw = fs.readFileSync(`${home}/.config/spacetime/cli.toml`, 'utf8');
+    return /spacetimedb_token\s*=\s*"([^"]+)"/.exec(raw)?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(8787),
-  FASTCARDS_DB: z.string().default('fastcards.db'),
+
+  // SpacetimeDB — the system of record. Local instance by default; the
+  // production database lives on maincloud (fastcards-357rw).
+  STDB_URI: z.string().default('ws://127.0.0.1:3000'),
+  STDB_DB: z.string().default('fastcards'),
+  /** Auth token for the gateway identity (the database owner). Falls
+   * back to the spacetime CLI's saved login. */
+  STDB_TOKEN: z.string().optional(),
 
   // Privy auth (live mode when both are set)
   PRIVY_APP_ID: z.string().optional(),
@@ -48,10 +67,11 @@ const envSchema = z.object({
   STELLAR_USDC_ISSUER: z.string().optional(),
   STELLAR_POLL_MS: z.coerce.number().int().min(0).default(30_000),
 
-  // KripiCard
+  // KripiCard (real external API — https://www.kripicard.com/api-docs)
   KRIPICARD_API_KEY: z.string().optional(),
-  KRIPICARD_BANK_BIN: z.string().optional(),
-  KRIPICARD_BASE_URL: z.string().url().default('https://home.kripicard.com/api/premium'),
+  /** Card BIN; 539502 (MasterCard HK) needs no dateOfBirth. */
+  KRIPICARD_BIN: z.string().default('539502'),
+  KRIPICARD_BASE_URL: z.string().url().default('https://appapi.kripicard.com'),
 
   // Ops
   CORS_ORIGIN: z.string().default('*'),
@@ -72,6 +92,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error(`Invalid environment configuration — ${issues}`);
   }
   const cfg = parsed.data;
+  if (!cfg.STDB_TOKEN) cfg.STDB_TOKEN = spacetimeCliToken();
   // Token verification works with a static SPKI key or, failing that,
   // the app's public JWKS endpoint — so app id + secret is enough.
   const privyEnabled = Boolean(cfg.PRIVY_APP_ID && (cfg.PRIVY_VERIFICATION_KEY || cfg.PRIVY_APP_SECRET));

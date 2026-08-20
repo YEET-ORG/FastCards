@@ -6,7 +6,7 @@
 
 import { z } from 'zod';
 
-import type { DB } from '../db.js';
+import type { Stdb } from '../stdb/client.js';
 import { prepareAction } from '../services/actions.js';
 import {
   getMember,
@@ -19,7 +19,7 @@ import {
 import { DomainError, type PreparedAction, type Session } from '../types.js';
 
 export interface AgentContext {
-  db: DB;
+  stdb: Stdb;
   session: Session;
   /** PREPARE results collected during the turn, for client rendering. */
   prepared: PreparedAction[];
@@ -29,12 +29,12 @@ export interface ToolDef {
   name: string;
   description: string;
   schema: z.ZodType;
-  run: (input: unknown) => string;
+  run: (input: unknown) => string | Promise<string>;
 }
 
-function asResult(fn: () => unknown): string {
+async function asResult(fn: () => unknown | Promise<unknown>): Promise<string> {
   try {
-    return JSON.stringify(fn());
+    return JSON.stringify(await fn());
   } catch (e) {
     if (e instanceof DomainError) return JSON.stringify({ error: e.code, message: e.message });
     throw e;
@@ -45,7 +45,7 @@ const prepareNote = (what: string) =>
   `${what} This PREPARES the change only — the user must confirm it in the app before anything executes. Never tell the user it is done.`;
 
 export function buildTools(ctx: AgentContext): ToolDef[] {
-  const { db, session } = ctx;
+  const { stdb, session } = ctx;
 
   const collect = (action: PreparedAction) => {
     ctx.prepared.push(action);
@@ -58,13 +58,13 @@ export function buildTools(ctx: AgentContext): ToolDef[] {
       description:
         'Balances and household budget visible to the current user. Managers see the household; members see only themselves.',
       schema: z.object({}),
-      run: () => asResult(() => getOverview(db, session)),
+      run: () => asResult(() => getOverview(stdb, session)),
     },
     {
       name: 'get_family_members',
       description: 'List family members visible to the current user, with ids, roles and monthly limits.',
       schema: z.object({}),
-      run: () => asResult(() => listMembers(db, session)),
+      run: () => asResult(() => listMembers(stdb, session)),
     },
     {
       name: 'get_member_spending',
@@ -72,13 +72,13 @@ export function buildTools(ctx: AgentContext): ToolDef[] {
         'One member: monthly limit, spent, remaining (including any active temporary allowance) and category budgets.',
       schema: z.object({ memberId: z.string().describe('Member id, e.g. m-maya') }),
       run: (input) =>
-        asResult(() => getMember(db, session, (input as { memberId: string }).memberId)),
+        asResult(() => getMember(stdb, session, (input as { memberId: string }).memberId)),
     },
     {
       name: 'get_cards',
       description: 'List cards visible to the current user with status, caps and rules.',
       schema: z.object({}),
-      run: () => asResult(() => listCards(db, session)),
+      run: () => asResult(() => listCards(stdb, session)),
     },
     {
       name: 'get_transactions',
@@ -88,13 +88,13 @@ export function buildTools(ctx: AgentContext): ToolDef[] {
         cardId: z.string().optional(),
         limit: z.number().int().min(1).max(50).optional(),
       }),
-      run: (input) => asResult(() => listTransactions(db, session, input as object)),
+      run: (input) => asResult(() => listTransactions(stdb, session, input as object)),
     },
     {
       name: 'get_pending_approvals',
       description: 'Pending purchase approvals visible to the current user.',
       schema: z.object({}),
-      run: () => asResult(() => listApprovals(db, session).filter((a) => a.status === 'pending')),
+      run: () => asResult(() => listApprovals(stdb, session).filter((a) => a.status === 'pending')),
     },
     {
       name: 'prepare_temp_allowance',
@@ -107,11 +107,11 @@ export function buildTools(ctx: AgentContext): ToolDef[] {
         expiresAtIso: z.string().describe('Exact ISO 8601 expiry, e.g. next Sunday 23:59 local time'),
       }),
       run: (input) =>
-        asResult(() => {
+        asResult(async () => {
           const i = input as { memberId: string; amountInr: number; expiresAtIso: string };
           return collect(
-            prepareAction(
-              db,
+            await prepareAction(
+              stdb,
               session,
               { kind: 'temp_allowance', memberId: i.memberId, amount: i.amountInr, expiresAt: i.expiresAtIso },
               'agent',
@@ -127,10 +127,10 @@ export function buildTools(ctx: AgentContext): ToolDef[] {
         freeze: z.boolean().describe('true to freeze, false to unfreeze'),
       }),
       run: (input) =>
-        asResult(() => {
+        asResult(async () => {
           const i = input as { cardId: string; freeze: boolean };
           return collect(
-            prepareAction(db, session, { kind: i.freeze ? 'freeze_card' : 'unfreeze_card', cardId: i.cardId }, 'agent'),
+            await prepareAction(stdb, session, { kind: i.freeze ? 'freeze_card' : 'unfreeze_card', cardId: i.cardId }, 'agent'),
           );
         }),
     },
@@ -139,10 +139,10 @@ export function buildTools(ctx: AgentContext): ToolDef[] {
       description: prepareNote("Prepare a permanent change to a member's monthly limit."),
       schema: z.object({ memberId: z.string(), amountInr: z.number().int().positive() }),
       run: (input) =>
-        asResult(() => {
+        asResult(async () => {
           const i = input as { memberId: string; amountInr: number };
           return collect(
-            prepareAction(db, session, { kind: 'set_monthly_limit', memberId: i.memberId, amount: i.amountInr }, 'agent'),
+            await prepareAction(stdb, session, { kind: 'set_monthly_limit', memberId: i.memberId, amount: i.amountInr }, 'agent'),
           );
         }),
     },
@@ -155,10 +155,10 @@ export function buildTools(ctx: AgentContext): ToolDef[] {
         amountInr: z.number().int().positive(),
       }),
       run: (input) =>
-        asResult(() => {
+        asResult(async () => {
           const i = input as { from: 'personal' | 'family'; to: 'personal' | 'family'; amountInr: number };
           return collect(
-            prepareAction(db, session, { kind: 'transfer', from: i.from, to: i.to, amount: i.amountInr }, 'agent'),
+            await prepareAction(stdb, session, { kind: 'transfer', from: i.from, to: i.to, amount: i.amountInr }, 'agent'),
           );
         }),
     },
@@ -176,7 +176,7 @@ export function buildTools(ctx: AgentContext): ToolDef[] {
         initialLoadInr: z.number().int().positive().describe('At least the provider minimum (about ₹880)'),
       }),
       run: (input) =>
-        asResult(() => {
+        asResult(async () => {
           const i = input as {
             cardType: 'family' | 'purpose';
             memberId?: string;
@@ -186,8 +186,8 @@ export function buildTools(ctx: AgentContext): ToolDef[] {
             initialLoadInr: number;
           };
           return collect(
-            prepareAction(
-              db,
+            await prepareAction(
+              stdb,
               session,
               {
                 kind: 'create_card',
@@ -208,11 +208,11 @@ export function buildTools(ctx: AgentContext): ToolDef[] {
       description: prepareNote("Prepare a permanent change to a card's ask-before-spending threshold."),
       schema: z.object({ cardId: z.string(), amountInr: z.number().int().positive() }),
       run: (input) =>
-        asResult(() => {
+        asResult(async () => {
           const i = input as { cardId: string; amountInr: number };
           return collect(
-            prepareAction(
-              db,
+            await prepareAction(
+              stdb,
               session,
               { kind: 'set_approval_threshold', cardId: i.cardId, amount: i.amountInr },
               'agent',
