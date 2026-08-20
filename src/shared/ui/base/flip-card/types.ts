@@ -28,6 +28,7 @@ interface FlipCardProps extends React.PropsWithChildren {
   readonly enableHaptics?: boolean;
   readonly onFlip?: (isFlipped: boolean) => void;
   readonly scaleOnPress?: boolean;
+  readonly initialFlipped?: boolean;
 }
 
 interface FlipCardFrontProps extends React.PropsWithChildren {

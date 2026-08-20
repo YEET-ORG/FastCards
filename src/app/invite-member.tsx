@@ -10,7 +10,8 @@ import { Segments } from '@/components/fin/Segments';
 import { Panel, ScreenHeader } from '@/components/fin/Screen';
 import { useToast } from '@/components/fin/Toast';
 import { AppText } from '@/design/AppText';
-import { color, font, radius, screenPad, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { font, radius, screenPad, space, type ColorTokens } from '@/design/tokens';
 import { useDomain } from '@/domain/store';
 
 // Add a family member — real invitation through the gateway. The receipt
@@ -24,6 +25,8 @@ export default function InviteMemberScreen() {
   const { headers } = useAuth();
   const { refresh } = useDomain();
   const toast = useToast();
+  const colors = useColors();
+  const styles = makeStyles(colors);
   const insets = useSafeAreaInsets();
 
   const [name, setName] = useState('');
@@ -65,15 +68,15 @@ export default function InviteMemberScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {result ? (
-          <Panel style={{ gap: space.m, borderColor: color.mintBorder }}>
+          <Panel style={{ gap: space.m, borderColor: colors.mintBorder }}>
             <AppText variant="section">Invitation ready</AppText>
-            <AppText variant="secondary" tone={color.textTertiary}>
+            <AppText variant="secondary" tone={colors.textTertiary}>
               Share this code — they sign in with their own account and enter it to join the household.
             </AppText>
             <AppText variant="hero" tabular style={{ fontSize: 34, letterSpacing: 4 }}>
               {inviteCode}
             </AppText>
-            <AppText variant="caption" tone={color.textTertiary}>
+            <AppText variant="caption" tone={colors.textTertiary}>
               {result.actor} · recorded in Activity
             </AppText>
           </Panel>
@@ -83,7 +86,7 @@ export default function InviteMemberScreen() {
               value={name}
               onChangeText={setName}
               placeholder="Name"
-              placeholderTextColor={color.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               style={styles.input}
               accessibilityLabel="Member name"
             />
@@ -91,7 +94,7 @@ export default function InviteMemberScreen() {
               value={relationship}
               onChangeText={setRelationship}
               placeholder="Relationship (optional), e.g. Daughter"
-              placeholderTextColor={color.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               style={styles.input}
               accessibilityLabel="Relationship"
             />
@@ -104,7 +107,7 @@ export default function InviteMemberScreen() {
               onChangeText={setLimitText}
               keyboardType="number-pad"
               placeholder="Monthly limit in ₹ (optional)"
-              placeholderTextColor={color.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               style={styles.input}
               accessibilityLabel="Monthly limit"
             />
@@ -134,18 +137,21 @@ export default function InviteMemberScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
+function makeStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingHorizontal: screenPad, paddingBottom: 60, gap: space.xl },
   input: {
-    backgroundColor: color.surface2,
+    backgroundColor: colors.surface2,
     borderWidth: 1,
-    borderColor: color.borderSoft,
+    borderColor: colors.borderSoft,
     borderRadius: radius.control,
-    color: color.textPrimary,
+    color: colors.textPrimary,
     fontFamily: font.medium,
     fontSize: 15,
     paddingHorizontal: space.l,
     paddingVertical: 12,
   },
 });
+}
+

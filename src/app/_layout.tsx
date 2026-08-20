@@ -4,19 +4,24 @@ import 'fast-text-encoding';
 import 'react-native-get-random-values';
 
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
+  Fraunces_400Regular,
+  Fraunces_500Medium,
+  Fraunces_600SemiBold,
+  Fraunces_700Bold,
   useFonts,
-} from '@expo-google-fonts/inter';
+} from '@expo-google-fonts/fraunces';
+import {
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import { PrivyProvider } from '@privy-io/expo';
-import { DarkTheme, ThemeProvider } from 'expo-router';
-import { Stack } from 'expo-router';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
+import { Appearance, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AuthProvider, useAuth } from '@/auth/AuthContext';
@@ -24,25 +29,15 @@ import { PRIVY_APP_ID, PRIVY_CLIENT_ID } from '@/auth/privyConfig';
 import { RestoringScreen } from '@/auth/RestoringScreen';
 import { SignInScreen } from '@/auth/SignInScreen';
 import { ToastProvider } from '@/components/fin/Toast';
-import { color } from '@/design/tokens';
+import { ThemeProvider, useTheme } from '@/design/theme';
 import { DomainProvider } from '@/domain/store';
 
+Appearance.setColorScheme('light');
 SplashScreen.preventAutoHideAsync();
-
-const obsidianTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: color.bg,
-    card: color.raised,
-    border: color.borderSoft,
-    text: color.textPrimary,
-    primary: color.mint,
-  },
-};
 
 function Gate() {
   const { session, restoring } = useAuth();
+  const { colors } = useTheme();
   if (restoring) return <RestoringScreen />;
   if (!session) return <SignInScreen />;
   return (
@@ -50,42 +45,76 @@ function Gate() {
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: color.bg },
+          contentStyle: { backgroundColor: colors.bg },
         }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="chat" />
+        <Stack.Screen name="profile" />
         <Stack.Screen name="approvals" />
         <Stack.Screen name="admin" />
+        <Stack.Screen name="card/[id]" />
+        <Stack.Screen name="card-rules/[id]" />
+        <Stack.Screen name="member/[id]" />
+        <Stack.Screen name="deposit" />
+        <Stack.Screen name="invite-member" />
+        <Stack.Screen name="move-money" />
+        <Stack.Screen name="order-card" />
+        <Stack.Screen name="transaction/[id]" />
       </Stack>
     </DomainProvider>
   );
 }
 
-export default function RootLayout() {
+function ThemedApp() {
+  const { mode, colors, ready } = useTheme();
   const [fontsLoaded] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
+    Fraunces_400Regular,
+    Fraunces_500Medium,
+    Fraunces_600SemiBold,
+    Fraunces_700Bold,
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
   });
 
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync();
-  }, [fontsLoaded]);
+    if (fontsLoaded && ready) SplashScreen.hideAsync();
+  }, [fontsLoaded, ready]);
 
-  if (!fontsLoaded) return null;
+  if (!fontsLoaded || !ready) return null;
+
+  const navTheme = {
+    ...(mode === 'night' ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(mode === 'night' ? DarkTheme.colors : DefaultTheme.colors),
+      background: colors.bg,
+      card: colors.raised,
+      border: colors.line,
+      text: colors.textPrimary,
+      primary: colors.accent,
+    },
+  };
 
   return (
+    <NavigationThemeProvider value={navTheme}>
+      <PrivyProvider appId={PRIVY_APP_ID} {...(PRIVY_CLIENT_ID ? { clientId: PRIVY_CLIENT_ID } : {})}>
+        <AuthProvider>
+          <ToastProvider>
+            <StatusBar style={mode === 'night' ? 'light' : 'dark'} />
+            <Gate />
+          </ToastProvider>
+        </AuthProvider>
+      </PrivyProvider>
+    </NavigationThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
     <GestureHandlerRootView style={StyleSheet.absoluteFill}>
-      <ThemeProvider value={obsidianTheme}>
-        <PrivyProvider appId={PRIVY_APP_ID} {...(PRIVY_CLIENT_ID ? { clientId: PRIVY_CLIENT_ID } : {})}>
-          <AuthProvider>
-            <ToastProvider>
-              <StatusBar style="light" />
-              <Gate />
-            </ToastProvider>
-          </AuthProvider>
-        </PrivyProvider>
+      <ThemeProvider>
+        <ThemedApp />
       </ThemeProvider>
     </GestureHandlerRootView>
   );

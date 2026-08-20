@@ -11,7 +11,8 @@ import { Segments } from '@/components/fin/Segments';
 import { Panel, ScreenHeader } from '@/components/fin/Screen';
 import { useToast } from '@/components/fin/Toast';
 import { AppText } from '@/design/AppText';
-import { color, font, radius, screenPad, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { font, radius, screenPad, space, type ColorTokens } from '@/design/tokens';
 import QRCode from '@/shared/ui/base/qr-code';
 
 // Get a card — the real purchase pipeline: KYC → order → pay the Stellar
@@ -46,6 +47,8 @@ const badgeFor = (status: string): BadgeStatus =>
 export default function OrderCardScreen() {
   const { headers } = useAuth();
   const toast = useToast();
+  const colors = useColors();
+  const styles = makeStyles(colors);
   const insets = useSafeAreaInsets();
 
   const [kyc, setKyc] = useState<Kyc | null>(null);
@@ -124,21 +127,21 @@ export default function OrderCardScreen() {
       </View>
       <ScrollView
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={color.mint} />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.accent} />}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
         {/* KYC gate */}
         {kyc === 'none' ? (
           <Panel style={{ gap: space.m }}>
             <AppText variant="section">Verify your identity</AppText>
-            <AppText variant="secondary" tone={color.textTertiary}>
+            <AppText variant="secondary" tone={colors.textTertiary}>
               One-time KYC before your first card. An admin reviews it.
             </AppText>
             <TextInput
               value={fullName}
               onChangeText={setFullName}
               placeholder="Full legal name"
-              placeholderTextColor={color.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               style={styles.input}
               accessibilityLabel="Full legal name"
             />
@@ -146,7 +149,7 @@ export default function OrderCardScreen() {
               value={document}
               onChangeText={setDocument}
               placeholder="ID document reference (e.g. Aadhaar last 4)"
-              placeholderTextColor={color.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               style={styles.input}
               accessibilityLabel="ID document reference"
             />
@@ -155,7 +158,7 @@ export default function OrderCardScreen() {
         ) : kyc === 'pending' ? (
           <Panel style={{ gap: space.s }}>
             <StatusBadge status="pending" label="KYC under review" />
-            <AppText variant="secondary" tone={color.textTertiary}>
+            <AppText variant="secondary" tone={colors.textTertiary}>
               You can order a card as soon as an admin approves your KYC.
             </AppText>
           </Panel>
@@ -167,7 +170,7 @@ export default function OrderCardScreen() {
               value={nickname}
               onChangeText={setNickname}
               placeholder="Card name, e.g. Shopping"
-              placeholderTextColor={color.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               style={styles.input}
               accessibilityLabel="Card name"
             />
@@ -177,7 +180,7 @@ export default function OrderCardScreen() {
 
         {/* Payment instructions for the freshest order */}
         {payment ? (
-          <Panel style={{ gap: space.m, borderColor: color.mintBorder }}>
+          <Panel style={{ gap: space.m, borderColor: colors.mintBorder }}>
             <AppText variant="section">Pay to continue</AppText>
             <View style={{ alignItems: 'center' }}>
               <QRCode
@@ -222,7 +225,7 @@ export default function OrderCardScreen() {
         <View style={{ gap: space.m }}>
           <AppText variant="section">Your orders</AppText>
           {orders.length === 0 ? (
-            <AppText variant="secondary" tone={color.textTertiary}>
+            <AppText variant="secondary" tone={colors.textTertiary}>
               No orders yet.
             </AppText>
           ) : (
@@ -230,11 +233,11 @@ export default function OrderCardScreen() {
               <Panel key={o.id} style={styles.orderRow}>
                 <View style={{ flex: 1 }}>
                   <AppText variant="cardTitle">{o.nickname}</AppText>
-                  <AppText variant="caption" tone={color.textTertiary}>
+                  <AppText variant="caption" tone={colors.textTertiary}>
                     ₹{o.price_inr.toLocaleString('en-IN')} · {o.expected_units} units · {o.memo}
                   </AppText>
                   {o.review_note ? (
-                    <AppText variant="caption" tone={color.warning}>
+                    <AppText variant="caption" tone={colors.warning}>
                       {o.review_note}
                     </AppText>
                   ) : null}
@@ -249,15 +252,16 @@ export default function OrderCardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
+function makeStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingHorizontal: screenPad, paddingBottom: 60, gap: space.xl },
   input: {
-    backgroundColor: color.surface2,
+    backgroundColor: colors.surface2,
     borderWidth: 1,
-    borderColor: color.borderSoft,
+    borderColor: colors.borderSoft,
     borderRadius: radius.control,
-    color: color.textPrimary,
+    color: colors.textPrimary,
     fontFamily: font.medium,
     fontSize: 15,
     paddingHorizontal: space.l,
@@ -267,3 +271,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: space.l, alignItems: 'flex-start' },
   orderRow: { flexDirection: 'row', alignItems: 'center', gap: space.m },
 });
+}
+

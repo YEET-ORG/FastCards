@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DEV_USERS, useAuth } from '@/auth/AuthContext';
 import { Avatar } from '@/components/fin/primitives';
 import { AppText } from '@/design/AppText';
-import { color, screenPad, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { font, screenPad, space } from '@/design/tokens';
 
 // Sign-in (spec UI §38): "Your money, one conversation away." Live login
 // is Privy email OTP — the code arrives by mail, the server binds the
@@ -19,6 +20,7 @@ type Step = 'idle' | 'email' | 'code';
 export function SignInScreen() {
   const { signInDev, privyError, retryPrivy } = useAuth();
   const insets = useSafeAreaInsets();
+  const colors = useColors();
 
   const [step, setStep] = useState<Step>('idle');
   const [email, setEmail] = useState('');
@@ -76,9 +78,9 @@ export function SignInScreen() {
   const shownError = error ?? privyError;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + space.x40, paddingBottom: insets.bottom + space.xl }]}>
+    <View style={[styles.root, { backgroundColor: colors.bg, paddingTop: insets.top + space.x40, paddingBottom: insets.bottom + space.xl }]}>
       <View style={styles.hero}>
-        <AppText variant="label" tone={color.mint}>
+        <AppText variant="label" tone={colors.accentInk}>
           FASTCARDS
         </AppText>
         <AppText variant="hero" style={{ fontSize: 38, lineHeight: 44 }}>
@@ -95,9 +97,9 @@ export function SignInScreen() {
             <Pressable
               onPress={startEmail}
               accessibilityRole="button"
-              style={({ pressed }) => [styles.privyBtn, pressed && { opacity: 0.8 }]}>
-              <Ionicons name="mail-outline" size={17} color={color.onMint} />
-              <AppText variant="cardTitle" tone={color.onMint}>
+              style={({ pressed }) => [styles.privyBtn, { backgroundColor: colors.accent }, pressed && { opacity: 0.8 }]}>
+              <Ionicons name="mail-outline" size={17} color={colors.onAccent} />
+              <AppText variant="cardTitle" tone={colors.onAccent}>
                 Continue with email
               </AppText>
             </Pressable>
@@ -110,15 +112,15 @@ export function SignInScreen() {
                 key={u.userId}
                 onPress={() => signInDev(u.userId)}
                 accessibilityRole="button"
-                style={({ pressed }) => [styles.userRow, pressed && { backgroundColor: color.surface2 }]}>
+                style={({ pressed }) => [styles.userRow, { backgroundColor: colors.cream, borderColor: colors.line }, pressed && { backgroundColor: colors.inset }]}>
                 <Avatar name={u.name} size={40} />
                 <View style={{ flex: 1 }}>
                   <AppText variant="cardTitle">{u.name}</AppText>
-                  <AppText variant="secondary" tone={color.textTertiary}>
+                  <AppText variant="secondary" tone={colors.textTertiary}>
                     {u.role === 'owner' ? 'Household owner · platform admin' : 'Teen member'}
                   </AppText>
                 </View>
-                <Ionicons name="chevron-forward" size={16} color={color.textTertiary} />
+                <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
               </Pressable>
             ))}
           </>
@@ -131,29 +133,29 @@ export function SignInScreen() {
               value={email}
               onChangeText={setEmail}
               placeholder="you@example.com"
-              placeholderTextColor={color.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
               autoFocus
               accessibilityLabel="Email address"
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.raised, borderColor: colors.line, color: colors.textPrimary, fontFamily: font.medium }]}
             />
             <Pressable
               onPress={submitEmail}
               disabled={busy}
               accessibilityRole="button"
-              style={({ pressed }) => [styles.privyBtn, (pressed || busy) && { opacity: 0.8 }]}>
+              style={({ pressed }) => [styles.privyBtn, { backgroundColor: colors.accent }, (pressed || busy) && { opacity: 0.8 }]}>
               {busy ? (
-                <ActivityIndicator color={color.onMint} />
+                <ActivityIndicator color={colors.onAccent} />
               ) : (
-                <AppText variant="cardTitle" tone={color.onMint}>
+                <AppText variant="cardTitle" tone={colors.onAccent}>
                   Send code
                 </AppText>
               )}
             </Pressable>
             <Pressable onPress={() => setStep('idle')} accessibilityRole="button" style={styles.linkBtn}>
-              <AppText variant="secondary" tone={color.textTertiary}>
+              <AppText variant="secondary" tone={colors.textTertiary}>
                 Back
               </AppText>
             </Pressable>
@@ -167,27 +169,27 @@ export function SignInScreen() {
               value={code}
               onChangeText={setCode}
               placeholder="123456"
-              placeholderTextColor={color.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               keyboardType="number-pad"
               autoFocus
               accessibilityLabel="One-time code"
-              style={[styles.input, styles.codeInput]}
+              style={[styles.input, styles.codeInput, { backgroundColor: colors.raised, borderColor: colors.lineStrong, color: colors.textPrimary, fontFamily: font.medium }]}
             />
             <Pressable
               onPress={submitCode}
               disabled={busy}
               accessibilityRole="button"
-              style={({ pressed }) => [styles.privyBtn, (pressed || busy) && { opacity: 0.8 }]}>
+              style={({ pressed }) => [styles.privyBtn, { backgroundColor: colors.accent }, (pressed || busy) && { opacity: 0.8 }]}>
               {busy ? (
-                <ActivityIndicator color={color.onMint} />
+                <ActivityIndicator color={colors.onAccent} />
               ) : (
-                <AppText variant="cardTitle" tone={color.onMint}>
+                <AppText variant="cardTitle" tone={colors.onAccent}>
                   Sign in
                 </AppText>
               )}
             </Pressable>
             <Pressable onPress={() => setStep('email')} accessibilityRole="button" style={styles.linkBtn}>
-              <AppText variant="secondary" tone={color.textTertiary}>
+              <AppText variant="secondary" tone={colors.textTertiary}>
                 Use a different email
               </AppText>
             </Pressable>
@@ -196,12 +198,12 @@ export function SignInScreen() {
 
         {shownError ? (
           <View style={{ gap: space.s }}>
-            <AppText variant="secondary" tone={color.error} accessibilityLiveRegion="polite">
+            <AppText variant="secondary" tone={colors.errorInk} accessibilityLiveRegion="polite">
               {shownError}
             </AppText>
             {privyError ? (
               <Pressable onPress={retryPrivy} accessibilityRole="button" style={styles.linkBtn}>
-                <AppText variant="secondary" tone={color.mint}>
+                <AppText variant="secondary" tone={colors.accentInk}>
                   Try again
                 </AppText>
               </Pressable>
@@ -216,7 +218,6 @@ export function SignInScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: color.bg,
     paddingHorizontal: screenPad,
     justifyContent: 'space-between',
   },
@@ -227,9 +228,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.m,
-    backgroundColor: color.surface1,
     borderWidth: 1,
-    borderColor: color.borderSoft,
     borderRadius: 16,
     padding: space.l,
   },
@@ -238,19 +237,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: space.s,
-    backgroundColor: color.mint,
     borderRadius: 999,
     minHeight: 52,
     marginTop: space.s,
   },
   input: {
-    backgroundColor: color.surface1,
     borderWidth: 1,
-    borderColor: color.borderSoft,
     borderRadius: 16,
     minHeight: 52,
     paddingHorizontal: space.l,
-    color: color.textPrimary,
     fontSize: 16,
   },
   codeInput: {

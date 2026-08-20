@@ -7,30 +7,32 @@ import { useAuth } from '@/auth/AuthContext';
 import { PrimaryButton, TextButton } from '@/components/fin/Buttons';
 import { ConfirmSheet } from '@/components/fin/ConfirmSheet';
 import { AppText } from '@/design/AppText';
-import { color, font, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { font, space } from '@/design/tokens';
 import LoadingState from '@/shared/ui/ai/thinking-state';
 
-// Known structured renderers for the Ask thread (spec §18). Proposals
-// come PREPARED from the server (facts + hash); confirming executes them
-// through the trusted gateway — the model never draws financial UI and
-// the client never invents facts.
-
 export function UserBubble({ text }: { text: string }) {
+  const colors = useColors();
   return (
-    <View style={styles.userBubble}>
+    <View
+      style={[
+        styles.userBubble,
+        { backgroundColor: colors.cream, borderColor: colors.line },
+      ]}>
       <AppText variant="body">{text}</AppText>
     </View>
   );
 }
 
 export function AssistantText({ text, degraded }: { text: string; degraded?: boolean }) {
+  const colors = useColors();
   return (
     <View style={{ gap: 4, maxWidth: '92%' }}>
-      <AppText variant="body" tone={color.textSecondary}>
+      <AppText variant="body" tone={colors.textSecondary}>
         {text}
       </AppText>
       {degraded ? (
-        <AppText variant="caption" tone={color.warning}>
+        <AppText variant="caption" tone={colors.warningInk}>
           AI is temporarily limited — answered with basic commands.
         </AppText>
       ) : null}
@@ -39,9 +41,10 @@ export function AssistantText({ text, degraded }: { text: string; degraded?: boo
 }
 
 export function ThinkingIndicator() {
+  const colors = useColors();
   return (
     <View style={styles.thinking}>
-      <Ionicons name="sparkles-outline" size={13} color={color.mint} style={{ marginTop: 4 }} />
+      <Ionicons name="sparkles-outline" size={13} color={colors.mintInk} style={{ marginTop: 4 }} />
       <LoadingState
         lines={['Checking balances…', 'Reading household rules…', 'Preparing a safe answer…']}
         visibleLines={2}
@@ -49,19 +52,13 @@ export function ThinkingIndicator() {
         scrollSpeed={900}
         showLineNumbers={false}
         containerStyle={{ height: 44, flex: 1 }}
-        lineTextStyle={{ color: color.textTertiary, fontSize: 13, fontFamily: font.regular }}
-        gradientColors={[color.bg, 'rgba(5,5,6,0)']}
+        lineTextStyle={{ color: colors.textTertiary, fontSize: 13, fontFamily: font.regular }}
+        gradientColors={[colors.bg, 'transparent']}
       />
     </View>
   );
 }
 
-/**
- * A server-prepared action awaiting the user's decision. "Review &
- * apply" opens the trusted ConfirmSheet showing the server's frozen
- * facts; confirm executes via the gateway (facts hash + step-up +
- * idempotency) and reports the receipt back to the thread.
- */
 export function ServerProposalBlock({
   action,
   status,
@@ -74,21 +71,26 @@ export function ServerProposalBlock({
   onCancelled: () => void;
 }) {
   const { headers } = useAuth();
+  const colors = useColors();
   const [confirming, setConfirming] = useState(false);
 
   return (
-    <View style={[styles.toolCard, styles.proposalCard]}>
+    <View
+      style={[
+        styles.toolCard,
+        { backgroundColor: colors.raised, borderColor: colors.lineStrong },
+      ]}>
       <View style={styles.eyebrow}>
-        <Ionicons name="create-outline" size={13} color={color.warning} />
-        <AppText variant="label" tone={color.warning}>
+        <Ionicons name="create-outline" size={13} color={colors.warningInk} />
+        <AppText variant="label" tone={colors.warningInk}>
           Proposed change
         </AppText>
       </View>
       <AppText variant="cardTitle">{action.subject}</AppText>
-      <View style={styles.factList}>
+      <View style={[styles.factList, { borderTopColor: colors.line }]}>
         {action.facts.map((f) => (
           <View key={f.label} style={styles.factRow}>
-            <AppText variant="secondary" tone={color.textTertiary}>
+            <AppText variant="secondary" tone={colors.textTertiary}>
               {f.label}
             </AppText>
             <AppText variant="secondary" tabular style={{ flexShrink: 1, textAlign: 'right' }}>
@@ -100,10 +102,10 @@ export function ServerProposalBlock({
 
       {status === 'pending' ? (
         <View style={styles.proposalActions}>
-          <PrimaryButton label="Review & apply" onPress={() => setConfirming(true)} style={{ flex: 1, minHeight: 44 }} />
+          <PrimaryButton label="Review & apply" onPress={() => setConfirming(true)} style={{ flex: 1, minHeight: 50 }} />
           <TextButton
             label="Cancel"
-            tone={color.textSecondary}
+            tone={colors.textSecondary}
             onPress={() => {
               void api.cancelAction(headers, action.id).catch(() => {});
               onCancelled();
@@ -113,7 +115,7 @@ export function ServerProposalBlock({
       ) : (
         <AppText
           variant="caption"
-          tone={status === 'executed' ? color.mint : status === 'failed' ? color.error : color.textTertiary}>
+          tone={status === 'executed' ? colors.mintInk : status === 'failed' ? colors.errorInk : colors.textTertiary}>
           {status === 'executed' ? 'Applied' : status === 'failed' ? 'Failed — nothing changed' : 'Cancelled'}
         </AppText>
       )}
@@ -136,19 +138,20 @@ export function ServerProposalBlock({
 }
 
 export function ReceiptBlock({ receipt }: { receipt: Receipt }) {
+  const colors = useColors();
   return (
-    <View style={[styles.toolCard, { borderColor: color.mintBorder }]}>
+    <View style={[styles.toolCard, { backgroundColor: colors.cream, borderColor: colors.mintBorder }]}>
       <View style={styles.eyebrow}>
-        <Ionicons name="checkmark-circle-outline" size={14} color={color.mint} />
-        <AppText variant="label" tone={color.mint}>
+        <Ionicons name="checkmark-circle-outline" size={14} color={colors.mintInk} />
+        <AppText variant="label" tone={colors.mintInk}>
           Done
         </AppText>
       </View>
       <AppText variant="cardTitle">{receipt.title}</AppText>
-      <View style={styles.factList}>
+      <View style={[styles.factList, { borderTopColor: colors.line }]}>
         {receipt.rows.map((r) => (
           <View key={r.label} style={styles.factRow}>
-            <AppText variant="secondary" tone={color.textTertiary}>
+            <AppText variant="secondary" tone={colors.textTertiary}>
               {r.label}
             </AppText>
             <AppText variant="secondary" tabular>
@@ -166,9 +169,7 @@ const styles = StyleSheet.create({
   userBubble: {
     alignSelf: 'flex-end',
     maxWidth: '82%',
-    backgroundColor: color.surface2,
     borderWidth: 1,
-    borderColor: color.borderSoft,
     borderRadius: 16,
     borderBottomRightRadius: 5,
     paddingHorizontal: space.l,
@@ -180,16 +181,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   toolCard: {
-    backgroundColor: color.surface1,
     borderWidth: 1,
-    borderColor: color.borderSoft,
     borderRadius: 18,
     padding: space.l,
     gap: space.m,
-  },
-  proposalCard: {
-    backgroundColor: color.surface2,
-    borderColor: color.borderStrong,
   },
   eyebrow: {
     flexDirection: 'row',
@@ -199,7 +194,6 @@ const styles = StyleSheet.create({
   factList: {
     gap: 7,
     borderTopWidth: 1,
-    borderTopColor: color.borderSoft,
     paddingTop: space.m,
   },
   factRow: {

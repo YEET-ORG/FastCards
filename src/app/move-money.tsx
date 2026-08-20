@@ -10,7 +10,8 @@ import { Segments } from '@/components/fin/Segments';
 import { Panel, ScreenHeader } from '@/components/fin/Screen';
 import { useToast } from '@/components/fin/Toast';
 import { AppText } from '@/design/AppText';
-import { color, font, radius, screenPad, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { font, radius, screenPad, space, type ColorTokens } from '@/design/tokens';
 import { formatMoney } from '@/domain/money';
 import { useDomain } from '@/domain/store';
 
@@ -23,6 +24,8 @@ export default function MoveMoneyScreen() {
   const { headers } = useAuth();
   const { state, refresh } = useDomain();
   const toast = useToast();
+  const colors = useColors();
+  const styles = makeStyles(colors);
   const insets = useSafeAreaInsets();
 
   const [mode, setMode] = useState(0); // 0 transfer · 1 withdraw
@@ -75,7 +78,7 @@ export default function MoveMoneyScreen() {
                 onChange={setDirection}
               />
               <View style={styles.row}>
-                <AppText variant="secondary" tone={color.textTertiary}>
+                <AppText variant="secondary" tone={colors.textTertiary}>
                   Available
                 </AppText>
                 <AppText variant="secondary" tabular>
@@ -91,20 +94,20 @@ export default function MoveMoneyScreen() {
                   value={address}
                   onChangeText={setAddress}
                   placeholder="G…"
-                  placeholderTextColor={color.textTertiary}
+                  placeholderTextColor={colors.textTertiary}
                   autoCapitalize="characters"
                   autoCorrect={false}
                   style={styles.input}
                   accessibilityLabel="Destination Stellar address"
                 />
                 {address.length > 0 && !validAddress ? (
-                  <AppText variant="caption" tone={color.warning}>
+                  <AppText variant="caption" tone={colors.warning}>
                     That doesn't look like a Stellar address yet.
                   </AppText>
                 ) : null}
               </View>
               <View style={styles.row}>
-                <AppText variant="secondary" tone={color.textTertiary}>
+                <AppText variant="secondary" tone={colors.textTertiary}>
                   Available · paid out on-chain by the treasury
                 </AppText>
                 <AppText variant="secondary" tabular>
@@ -121,7 +124,7 @@ export default function MoveMoneyScreen() {
               onChangeText={setAmountText}
               keyboardType="number-pad"
               placeholder="₹ amount"
-              placeholderTextColor={color.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               style={[styles.input, { fontSize: 22 }]}
               accessibilityLabel="Amount in rupees"
             />
@@ -136,7 +139,7 @@ export default function MoveMoneyScreen() {
         </Panel>
 
         {mode === 1 ? (
-          <AppText variant="secondary" tone={color.textTertiary}>
+          <AppText variant="secondary" tone={colors.textTertiary}>
             Crypto transfers are irreversible. Withdrawals are queued and signed by the treasury wallet, then
             confirmed on-chain — track them in Activity.
           </AppText>
@@ -164,16 +167,17 @@ export default function MoveMoneyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
+function makeStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingHorizontal: screenPad, paddingBottom: 60, gap: space.xl },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: space.m, flexWrap: 'wrap' },
   input: {
-    backgroundColor: color.surface2,
+    backgroundColor: colors.surface2,
     borderWidth: 1,
-    borderColor: color.borderSoft,
+    borderColor: colors.borderSoft,
     borderRadius: radius.control,
-    color: color.textPrimary,
+    color: colors.textPrimary,
     fontFamily: font.medium,
     fontSize: 15,
     paddingHorizontal: space.l,
@@ -181,3 +185,5 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 });
+}
+

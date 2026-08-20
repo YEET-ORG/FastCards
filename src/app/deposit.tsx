@@ -9,7 +9,8 @@ import { SecondaryButton } from '@/components/fin/Buttons';
 import { Panel, ScreenHeader } from '@/components/fin/Screen';
 import { useToast } from '@/components/fin/Toast';
 import { AppText } from '@/design/AppText';
-import { color, font, screenPad, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { font, screenPad, space, type ColorTokens } from '@/design/tokens';
 import { useDomain } from '@/domain/store';
 import QRCode from '@/shared/ui/base/qr-code';
 
@@ -30,6 +31,8 @@ export default function DepositScreen() {
   const { headers } = useAuth();
   const { refresh } = useDomain();
   const toast = useToast();
+  const colors = useColors();
+  const styles = makeStyles(colors);
   const insets = useSafeAreaInsets();
   const [intent, setIntent] = useState<Intent | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -77,7 +80,7 @@ export default function DepositScreen() {
       </View>
       <ScrollView
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={syncing} onRefresh={() => void sync()} tintColor={color.mint} />}
+        refreshControl={<RefreshControl refreshing={syncing} onRefresh={() => void sync()} tintColor={colors.accent} />}
         showsVerticalScrollIndicator={false}>
         {intent ? (
           <>
@@ -99,7 +102,7 @@ export default function DepositScreen() {
                 </AppText>
               </Pressable>
               <View style={styles.row}>
-                <AppText variant="secondary" tone={color.textTertiary}>
+                <AppText variant="secondary" tone={colors.textTertiary}>
                   Asset
                 </AppText>
                 <AppText variant="secondary" tabular>
@@ -107,7 +110,7 @@ export default function DepositScreen() {
                 </AppText>
               </View>
               <View style={styles.row}>
-                <AppText variant="secondary" tone={color.textTertiary}>
+                <AppText variant="secondary" tone={colors.textTertiary}>
                   Rate
                 </AppText>
                 <AppText variant="secondary" tabular>
@@ -116,14 +119,14 @@ export default function DepositScreen() {
               </View>
             </Panel>
 
-            <AppText variant="secondary" tone={color.textTertiary}>
+            <AppText variant="secondary" tone={colors.textTertiary}>
               {intent.note}
             </AppText>
 
             <SecondaryButton label={syncing ? 'Checking…' : 'Check for deposits'} loading={syncing} onPress={() => void sync()} />
           </>
         ) : (
-          <AppText variant="secondary" tone={color.textTertiary}>
+          <AppText variant="secondary" tone={colors.textTertiary}>
             Loading deposit details…
           </AppText>
         )}
@@ -132,10 +135,13 @@ export default function DepositScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.bg },
+function makeStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingHorizontal: screenPad, paddingBottom: 60, gap: space.xl },
   qrWrap: { alignItems: 'center', paddingVertical: space.s },
   monoText: { fontFamily: font.medium, marginTop: 4 },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: space.m },
 });
+}
+

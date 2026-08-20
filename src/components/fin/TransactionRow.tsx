@@ -2,12 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/design/AppText';
-import { color, font, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { font, space } from '@/design/tokens';
 import { formatSigned, relativeTime } from '@/domain/money';
 import type { Member, Transaction } from '@/domain/types';
-
-// TransactionRow (spec UI §23): normal purchases in primary text — red is
-// reserved for declines; credits use mint with a leading plus.
 
 const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
   Food: 'restaurant-outline',
@@ -30,12 +28,9 @@ export function TransactionRow({
   onPress?: () => void;
   showMember?: boolean;
 }) {
+  const colors = useColors();
   const declined = txn.status === 'declined';
-  const amountTone = declined
-    ? color.textTertiary
-    : txn.direction === 'credit'
-      ? color.mint
-      : color.textPrimary;
+  const credit = txn.direction === 'credit';
 
   const subtitleParts = [
     showMember && member ? member.name : null,
@@ -48,20 +43,20 @@ export function TransactionRow({
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={`${txn.merchant}, ${formatSigned(txn.amount, txn.direction)}${declined ? ', declined' : ''}`}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: color.surface1 }]}>
-      <View style={styles.icon}>
+      accessibilityLabel={`${txn.merchant}, ${formatSigned(txn.amount, txn.direction)}${declined ? ', declined' : ''}${credit ? ', received' : ''}`}
+      style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.cream }]}>
+      <View style={[styles.icon, { backgroundColor: colors.raised, borderColor: colors.line }]}>
         <Ionicons
           name={categoryIcons[txn.category] ?? 'card-outline'}
           size={17}
-          color={declined ? color.textTertiary : color.textSecondary}
+          color={declined ? colors.textTertiary : colors.textSecondary}
         />
       </View>
       <View style={styles.center}>
-        <AppText variant="body" numberOfLines={1} tone={declined ? color.textSecondary : undefined}>
+        <AppText variant="body" numberOfLines={1} tone={declined ? colors.textSecondary : undefined}>
           {txn.merchant}
         </AppText>
-        <AppText variant="secondary" tone={color.textTertiary} numberOfLines={1}>
+        <AppText variant="secondary" tone={colors.textTertiary} numberOfLines={1}>
           {declined ? (txn.declineReason ?? 'Declined') : subtitleParts.join(' · ')}
         </AppText>
       </View>
@@ -69,13 +64,17 @@ export function TransactionRow({
         <AppText
           variant="body"
           tabular
-          tone={amountTone}
+          tone={colors.textPrimary}
           style={[{ fontFamily: font.medium }, declined && styles.struck]}>
           {formatSigned(txn.amount, txn.direction)}
         </AppText>
         {declined ? (
-          <AppText variant="caption" tone={color.error}>
+          <AppText variant="caption" tone={colors.errorInk}>
             Declined
+          </AppText>
+        ) : credit ? (
+          <AppText variant="caption" tone={colors.mintInk}>
+            Received
           </AppText>
         ) : (
           <AppText variant="caption">{relativeTime(txn.at)}</AppText>
@@ -99,9 +98,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 13,
-    backgroundColor: color.surface2,
     borderWidth: 1,
-    borderColor: color.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },

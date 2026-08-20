@@ -8,7 +8,8 @@ import { RuleChip, SectionHeader } from '@/components/fin/primitives';
 import { Panel, Screen, ScreenHeader } from '@/components/fin/Screen';
 import { useToast } from '@/components/fin/Toast';
 import { AppText } from '@/design/AppText';
-import { color, font, radius, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { font, radius, space, type ColorTokens } from '@/design/tokens';
 import { formatMoney } from '@/domain/money';
 import { useDomain } from '@/domain/store';
 
@@ -29,6 +30,8 @@ export default function CardRules() {
   const { state, dispatch } = useDomain();
   const router = useRouter();
   const toast = useToast();
+  const colors = useColors();
+  const styles = makeStyles(colors);
 
   const [editing, setEditing] = useState<'limit' | 'threshold' | null>(null);
   const [amountText, setAmountText] = useState('');
@@ -68,12 +71,12 @@ export default function CardRules() {
 
       {/* AI rule composer — routes to Ask; changes come back as proposals */}
       <View style={styles.aiComposer}>
-        <Ionicons name="sparkles-outline" size={16} color={color.mint} />
+        <Ionicons name="sparkles-outline" size={16} color={colors.mint} />
         <TextInput
           value={aiText}
           onChangeText={setAiText}
           placeholder="Describe a change… e.g. “add ₹1,000 until Sunday”"
-          placeholderTextColor={color.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           style={styles.aiInput}
           onSubmitEditing={askAI}
           returnKeyType="send"
@@ -81,7 +84,7 @@ export default function CardRules() {
         />
         {aiText.trim() ? (
           <Pressable onPress={askAI} hitSlop={8} accessibilityRole="button" accessibilityLabel="Send">
-            <Ionicons name="arrow-up-circle" size={24} color={color.mint} />
+            <Ionicons name="arrow-up-circle" size={24} color={colors.mint} />
           </Pressable>
         ) : null}
       </View>
@@ -93,29 +96,29 @@ export default function CardRules() {
           <Pressable
             onPress={() => openEditor('limit')}
             accessibilityRole="button"
-            style={({ pressed }) => [styles.ruleRow, pressed && { backgroundColor: color.surface2 }]}>
+            style={({ pressed }) => [styles.ruleRow, pressed && { backgroundColor: colors.surface2 }]}>
             <View style={{ flex: 1, gap: 2 }}>
               <AppText variant="body">Monthly limit</AppText>
-              <AppText variant="secondary" tone={color.textTertiary}>
+              <AppText variant="secondary" tone={colors.textTertiary}>
                 {card.monthlyCap !== undefined ? `${formatMoney(card.monthlyCap)} per month` : 'No limit set'}
               </AppText>
             </View>
-            <Ionicons name="chevron-forward" size={16} color={color.textTertiary} />
+            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
           </Pressable>
           <View style={styles.divider} />
           <Pressable
             onPress={() => openEditor('threshold')}
             accessibilityRole="button"
-            style={({ pressed }) => [styles.ruleRow, pressed && { backgroundColor: color.surface2 }]}>
+            style={({ pressed }) => [styles.ruleRow, pressed && { backgroundColor: colors.surface2 }]}>
             <View style={{ flex: 1, gap: 2 }}>
               <AppText variant="body">Approval threshold</AppText>
-              <AppText variant="secondary" tone={color.textTertiary}>
+              <AppText variant="secondary" tone={colors.textTertiary}>
                 {card.approvalAbove !== undefined
                   ? `Ask me before purchases over ${formatMoney(card.approvalAbove)}`
                   : 'No approval required'}
               </AppText>
             </View>
-            <Ionicons name="chevron-forward" size={16} color={color.textTertiary} />
+            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
           </Pressable>
         </Panel>
       </View>
@@ -142,7 +145,7 @@ export default function CardRules() {
                 <View style={styles.ruleRow}>
                   <View style={{ flex: 1, gap: 2 }}>
                     <AppText variant="body">{c.label}</AppText>
-                    <AppText variant="secondary" tone={color.textTertiary}>
+                    <AppText variant="secondary" tone={colors.textTertiary}>
                       {c.enabled ? `Up to ${formatMoney(c.cap)} per month` : 'Off — purchases decline'}
                     </AppText>
                   </View>
@@ -152,8 +155,8 @@ export default function CardRules() {
                       dispatch({ type: 'toggle_category', memberId: member.id, categoryKey: c.key });
                       toast(`${c.label} turned ${c.enabled ? 'off' : 'on'} for ${member.name}.`);
                     }}
-                    trackColor={{ false: color.surface3, true: color.mintDim }}
-                    thumbColor={c.enabled ? color.mint : color.textTertiary}
+                    trackColor={{ false: colors.surface3, true: colors.mintDim }}
+                    thumbColor={c.enabled ? colors.mint : colors.textTertiary}
                     accessibilityLabel={`${c.label} category, ${c.enabled ? 'on' : 'off'}`}
                   />
                 </View>
@@ -180,8 +183,8 @@ export default function CardRules() {
                     dispatch({ type: 'toggle_channel', cardId: card.id, channel: key });
                     toast(`${label} turned ${card.channels[key] ? 'off' : 'on'}.`);
                   }}
-                  trackColor={{ false: color.surface3, true: color.mintDim }}
-                  thumbColor={card.channels[key] ? color.mint : color.textTertiary}
+                  trackColor={{ false: colors.surface3, true: colors.mintDim }}
+                  thumbColor={card.channels[key] ? colors.mint : colors.textTertiary}
                   accessibilityLabel={`${label}, ${card.channels[key] ? 'on' : 'off'}`}
                 />
               </View>
@@ -246,12 +249,12 @@ export default function CardRules() {
             onChangeText={setAmountText}
             keyboardType="number-pad"
             placeholder="Amount in ₹"
-            placeholderTextColor={color.textTertiary}
+            placeholderTextColor={colors.textTertiary}
             style={styles.amountInput}
             autoFocus
             accessibilityLabel="Amount"
           />
-          <AppText variant="caption" tone={color.textTertiary}>
+          <AppText variant="caption" tone={colors.textTertiary}>
             Enter an amount to review the change.
           </AppText>
         </Panel>
@@ -260,21 +263,22 @@ export default function CardRules() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ColorTokens) {
+  return StyleSheet.create({
   aiComposer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.s,
-    backgroundColor: color.raised,
+    backgroundColor: colors.raised,
     borderWidth: 1,
-    borderColor: color.borderStrong,
+    borderColor: colors.borderStrong,
     borderRadius: radius.tile,
     paddingHorizontal: space.m,
     paddingVertical: 6,
   },
   aiInput: {
     flex: 1,
-    color: color.textPrimary,
+    color: colors.textPrimary,
     fontFamily: font.regular,
     fontSize: 14,
     paddingVertical: 8,
@@ -288,18 +292,20 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: color.borderSoft,
+    backgroundColor: colors.borderSoft,
     marginLeft: space.l,
   },
   amountInput: {
-    backgroundColor: color.surface2,
+    backgroundColor: colors.surface2,
     borderWidth: 1,
-    borderColor: color.borderSoft,
+    borderColor: colors.borderSoft,
     borderRadius: radius.control,
-    color: color.textPrimary,
+    color: colors.textPrimary,
     fontFamily: font.medium,
     fontSize: 18,
     paddingHorizontal: space.l,
     paddingVertical: 12,
   },
 });
+}
+

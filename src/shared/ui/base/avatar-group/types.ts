@@ -4,6 +4,7 @@ interface AvatarItem {
   readonly id: string;
   readonly uri?: string;
   readonly name?: string;
+  readonly color?: string;
 }
 
 interface IAnimatedAvatar {
@@ -11,6 +12,7 @@ interface IAnimatedAvatar {
     id: string;
     uri?: string;
     name?: string;
+    color?: string;
   };
   size: number;
   overlap: number;

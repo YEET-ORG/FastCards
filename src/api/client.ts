@@ -5,6 +5,7 @@
 
 import { Platform } from 'react-native';
 
+import type { MemberHueId } from '@/design/tokens';
 import type {
   Approval,
   AuditEvent,
@@ -59,9 +60,15 @@ async function request<T>(
 
 // ------------------------------------------------------------- mappers
 
-const ACCENTS = ['#7AA7FF', '#46E6A2', '#F3B84B', '#A0A1A8', '#FF6B70', '#6EF0B6'];
-const accentFor = (id: string) =>
-  ACCENTS[Math.abs([...id].reduce((h, c) => (h << 5) - h + c.charCodeAt(0), 0)) % ACCENTS.length];
+const MEMBER_HUE: Record<string, MemberHueId> = {
+  'm-rohan': 'rohan',
+  'm-maya': 'maya',
+  'm-arjun': 'arjun',
+  'm-dad': 'dad',
+};
+function hueIdFor(memberId: string): MemberHueId {
+  return MEMBER_HUE[memberId] ?? 'pool';
+}
 
 const labelFor = (iso: string) =>
   new Date(iso).toLocaleString('en-IN', {
@@ -82,7 +89,7 @@ function mapMember(m: any, cards: Card[]): Member {
     role: m.role,
     relationship: m.relationship ?? undefined,
     initials: (m.name as string).slice(0, 1).toUpperCase(),
-    accentColor: accentFor(m.id),
+    hueId: hueIdFor(m.id),
     monthlyLimit: m.monthly_limit ?? undefined,
     spentThisMonth: m.spent_this_month,
     tempAllowance: active

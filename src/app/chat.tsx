@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, ApiError, type Receipt, type ServerPreparedAction } from '@/api/client';
@@ -16,7 +16,8 @@ import { Composer } from '@/components/ask/Composer';
 import { ScreenHeader } from '@/components/fin/Screen';
 import { useToast } from '@/components/fin/Toast';
 import { AppText } from '@/design/AppText';
-import { color, screenPad, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { screenPad, space } from '@/design/tokens';
 import { useAuth } from '@/auth/AuthContext';
 import { useDomain } from '@/domain/store';
 
@@ -41,6 +42,7 @@ export default function ChatScreen() {
   const { state, refresh } = useDomain();
   const toast = useToast();
   const insets = useSafeAreaInsets();
+  const colors = useColors();
   const scrollRef = useRef<ScrollView>(null);
   const [items, setItems] = useState<ChatItem[]>([]);
   const [busy, setBusy] = useState(false);
@@ -115,23 +117,17 @@ export default function ChatScreen() {
     setItems((prev) => prev.map((i) => (i.id === id && i.role === 'proposal' ? { ...i, status } : i)));
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + space.s }]}>
+    <View style={[styles.root, { backgroundColor: colors.bg, paddingTop: insets.top + space.s }]}>
       <View style={{ paddingHorizontal: screenPad }}>
         <ScreenHeader title="Ask" back />
         {contextMember ? (
           <View style={styles.contextRow}>
-            <View style={styles.contextChip}>
-              <Ionicons name="person-outline" size={12} color={color.textSecondary} />
-              <AppText variant="caption" tone={color.textSecondary}>
+            <View style={[styles.contextChip, { backgroundColor: colors.cream, borderColor: colors.line }]}>
+              <Ionicons name="person-outline" size={12} color={colors.textSecondary} />
+              <AppText variant="caption" tone={colors.textSecondary}>
                 {contextMember.name}
               </AppText>
-              <Pressable
-                onPress={() => setContextMemberId(undefined)}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel={`Remove ${contextMember.name} context`}>
-                <Ionicons name="close" size={12} color={color.textTertiary} />
-              </Pressable>
+
             </View>
           </View>
         ) : null}
@@ -145,10 +141,10 @@ export default function ChatScreen() {
           showsVerticalScrollIndicator={false}>
           {items.length === 0 ? (
             <View style={styles.empty}>
-              <AppText variant="secondary" tone={color.textTertiary} style={{ textAlign: 'center' }}>
+              <AppText variant="secondary" tone={colors.textTertiary} style={{ textAlign: 'center' }}>
                 Ask about spending, cards, family or shopping.
               </AppText>
-              <AppText variant="secondary" tone={color.textTertiary} style={{ textAlign: 'center' }}>
+              <AppText variant="secondary" tone={colors.textTertiary} style={{ textAlign: 'center' }}>
                 Try "Give Maya ₹1,000 more until Sunday" or "Freeze Dad's card".
               </AppText>
             </View>
@@ -183,7 +179,7 @@ export default function ChatScreen() {
           })}
         </ScrollView>
 
-        <View style={[styles.composerWrap, { paddingBottom: insets.bottom + space.m }]}>
+        <View style={[styles.composerWrap, { paddingBottom: insets.bottom + space.m, backgroundColor: colors.bg }]}>
           <Composer onSubmit={(t) => void submit(t)} autoFocus={items.length === 0} />
         </View>
       </KeyboardAvoidingView>
@@ -194,7 +190,6 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: color.bg,
   },
   contextRow: {
     flexDirection: 'row',
@@ -204,9 +199,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: color.surface2,
     borderWidth: 1,
-    borderColor: color.borderSoft,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -227,6 +220,5 @@ const styles = StyleSheet.create({
   composerWrap: {
     paddingHorizontal: screenPad,
     paddingTop: space.s,
-    backgroundColor: color.bg,
   },
 });

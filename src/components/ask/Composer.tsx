@@ -1,12 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 
-import { color, radius } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { font, radius } from '@/design/tokens';
 import BottomInputBar from '@/shared/ui/ai/bottom-input-bar';
-
-// Ask composer on Reacticx's AI bottom-input-bar: multiline input on top,
-// accessory row beneath — sparkles + mic left, mint send right.
 
 export function Composer({
   onSubmit,
@@ -17,6 +15,7 @@ export function Composer({
   placeholder?: string;
   autoFocus?: boolean;
 }) {
+  const colors = useColors();
   const [text, setText] = useState('');
   const hasText = text.trim().length > 0;
 
@@ -32,29 +31,19 @@ export function Composer({
       value={text}
       onChangeText={setText}
       placeholder={placeholder}
-      placeholderTextColor={color.textTertiary}
+      placeholderTextColor={colors.textTertiary}
       multiline
       minHeight={92}
       maxHeight={170}
       autoFocus={autoFocus}
       onSend={send}
       style={styles.wrapper}
-      containerStyle={styles.container}
-      inputStyle={styles.input}
-      renderLeftAccessory={() => (
-        <>
-          <Ionicons name="sparkles-outline" size={18} color={color.mint} />
-          <Pressable
-            onPress={() =>
-              Alert.alert('Voice input', 'Voice mode arrives after the MVP. Type your request for now.')
-            }
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Voice input, coming later">
-            <Ionicons name="mic-outline" size={19} color={color.textTertiary} />
-          </Pressable>
-        </>
-      )}
+      containerStyle={[
+        styles.container,
+        { backgroundColor: colors.raised, borderColor: colors.lineStrong },
+      ]}
+      inputStyle={[styles.input, { color: colors.textPrimary, fontFamily: font.regular }]}
+      renderLeftAccessory={() => <Ionicons name="sparkles-outline" size={16} color={colors.mintInk} />}
       renderRightAccessory={() => (
         <Pressable
           onPress={send}
@@ -62,8 +51,8 @@ export function Composer({
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="Send"
-          style={[styles.sendBtn, !hasText && { backgroundColor: color.surface3 }]}>
-          <Ionicons name="arrow-up" size={17} color={hasText ? color.onMint : color.textTertiary} />
+          style={[styles.sendBtn, { backgroundColor: hasText ? colors.accent : colors.inset }]}>
+          <Ionicons name="arrow-up" size={17} color={hasText ? colors.onAccent : colors.textTertiary} />
         </Pressable>
       )}
     />
@@ -76,22 +65,18 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   container: {
-    backgroundColor: color.raised,
     borderWidth: 1,
-    borderColor: color.borderStrong,
     borderRadius: radius.card,
     paddingTop: 14,
     paddingBottom: 10,
   },
   input: {
     fontSize: 15,
-    color: color.textPrimary,
   },
   sendBtn: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: color.mint,
     alignItems: 'center',
     justifyContent: 'center',
   },

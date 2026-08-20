@@ -1,10 +1,9 @@
+import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, type ViewStyle } from 'react-native';
 
 import { AppText } from '@/design/AppText';
-import { color, font, radius } from '@/design/tokens';
-
-// Button system (spec UI §41): one mint primary per surface; loading
-// buttons keep their width and label context.
+import { useColors } from '@/design/theme';
+import { font, radius, type ColorTokens } from '@/design/tokens';
 
 interface ButtonProps {
   label: string;
@@ -15,6 +14,8 @@ interface ButtonProps {
 }
 
 export function PrimaryButton({ label, onPress, disabled, loading, style }: ButtonProps) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const inactive = disabled || loading;
   return (
     <Pressable
@@ -25,12 +26,12 @@ export function PrimaryButton({ label, onPress, disabled, loading, style }: Butt
       style={({ pressed }) => [
         styles.base,
         styles.primary,
-        pressed && { backgroundColor: color.mintBright },
+        pressed && { backgroundColor: colors.accentBright },
         disabled && !loading && { opacity: 0.45 },
         style,
       ]}>
-      {loading ? <ActivityIndicator size="small" color={color.onMint} /> : null}
-      <AppText variant="cardTitle" tone={color.onMint} style={styles.labelText}>
+      {loading ? <ActivityIndicator size="small" color={colors.onAccent} /> : null}
+      <AppText variant="cardTitle" tone={colors.onAccent} style={styles.labelText}>
         {label}
       </AppText>
     </Pressable>
@@ -38,6 +39,8 @@ export function PrimaryButton({ label, onPress, disabled, loading, style }: Butt
 }
 
 export function SecondaryButton({ label, onPress, disabled, loading, style }: ButtonProps) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Pressable
       onPress={onPress}
@@ -47,11 +50,11 @@ export function SecondaryButton({ label, onPress, disabled, loading, style }: Bu
       style={({ pressed }) => [
         styles.base,
         styles.secondary,
-        pressed && { backgroundColor: color.surface3 },
+        pressed && { backgroundColor: colors.inset },
         disabled && { opacity: 0.45 },
         style,
       ]}>
-      {loading ? <ActivityIndicator size="small" color={color.textPrimary} /> : null}
+      {loading ? <ActivityIndicator size="small" color={colors.textPrimary} /> : null}
       <AppText variant="cardTitle" style={styles.labelText}>
         {label}
       </AppText>
@@ -62,7 +65,7 @@ export function SecondaryButton({ label, onPress, disabled, loading, style }: Bu
 export function TextButton({
   label,
   onPress,
-  tone = color.mint,
+  tone,
   destructive,
 }: {
   label: string;
@@ -70,12 +73,14 @@ export function TextButton({
   tone?: string;
   destructive?: boolean;
 }) {
+  const colors = useColors();
+  const resolved = destructive ? colors.errorInk : (tone ?? colors.accentInk);
   return (
-    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" style={styles.textBtn}>
+    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" style={stylesStatic.textBtn}>
       {({ pressed }) => (
         <AppText
           variant="secondary"
-          tone={destructive ? color.error : tone}
+          tone={resolved}
           style={[{ fontFamily: font.medium }, pressed && { opacity: 0.6 }]}>
           {label}
         </AppText>
@@ -84,27 +89,35 @@ export function TextButton({
   );
 }
 
-const styles = StyleSheet.create({
-  base: {
-    minHeight: 50,
-    borderRadius: radius.control + 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 18,
-  },
-  primary: {
-    backgroundColor: color.mint,
-  },
-  secondary: {
-    backgroundColor: color.surface2,
-    borderWidth: 1,
-    borderColor: color.borderSoft,
-  },
-  labelText: {
-    textAlign: 'center',
-  },
+function makeStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    base: {
+      minHeight: 50,
+      borderRadius: radius.control + 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 8,
+      paddingHorizontal: 18,
+    },
+    primary: {
+      backgroundColor: colors.accent,
+    },
+    secondary: {
+      backgroundColor: colors.raised,
+      borderWidth: 1,
+      borderColor: colors.line,
+    },
+    labelText: {
+      textAlign: 'center',
+      fontSize: 16,
+      lineHeight: 22,
+      fontFamily: font.medium,
+    },
+  });
+}
+
+const stylesStatic = StyleSheet.create({
   textBtn: {
     paddingVertical: 8,
     alignItems: 'center',

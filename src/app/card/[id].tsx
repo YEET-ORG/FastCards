@@ -8,15 +8,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
 import { PrimaryButton, TextButton } from '@/components/fin/Buttons';
-import { PaymentCardVisual } from '@/components/fin/PaymentCardVisual';
+import { PaymentCardVisual, CARD_RATIO } from '@/components/fin/PaymentCardVisual';
 import { QuickAction, RuleChip, SectionHeader, StatusBadge } from '@/components/fin/primitives';
 import { Panel, Screen, ScreenHeader } from '@/components/fin/Screen';
 import { useToast } from '@/components/fin/Toast';
 import { TransactionRow } from '@/components/fin/TransactionRow';
 import { AppText } from '@/design/AppText';
-import { color, font, radius, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { font, radius, space, type ColorTokens } from '@/design/tokens';
 import { formatMoney } from '@/domain/money';
 import { useDomain } from '@/domain/store';
+import { FlipCard } from '@/shared/ui/base/flip-card';
+import { useReduceMotion } from '@/design/motion';
 
 // Card Detail (spec §21-22, UI §10-11): an object control surface.
 // Sensitive details live behind device biometrics and come from the
@@ -29,6 +32,9 @@ export default function CardDetail() {
   const { headers } = useAuth();
   const router = useRouter();
   const toast = useToast();
+  const colors = useColors();
+  const styles = makeStyles(colors);
+  const reduceMotion = useReduceMotion();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [reveal, setReveal] = useState<'hidden' | 'authenticating' | 'shown'>('hidden');
@@ -117,12 +123,12 @@ export default function CardDetail() {
         {remaining !== undefined && !closed ? (
           <AppText variant="body" tabular>
             {formatMoney(Math.max(remaining, 0))}{' '}
-            <AppText variant="secondary" tone={color.textTertiary}>
+            <AppText variant="secondary" tone={colors.textTertiary}>
               left of {formatMoney(effectiveCap ?? 0)}
             </AppText>
           </AppText>
         ) : (
-          <AppText variant="secondary" tone={color.textTertiary}>
+          <AppText variant="secondary" tone={colors.textTertiary}>
             {closed ? `Spent ${formatMoney(card.spentThisMonth)}` : `Spent ${formatMoney(card.spentThisMonth)} this month`}
           </AppText>
         )}
@@ -174,7 +180,7 @@ export default function CardDetail() {
       <View>
         <SectionHeader title="Recent activity" />
         {cardTxns.length === 0 ? (
-          <AppText variant="secondary" tone={color.textTertiary}>
+          <AppText variant="secondary" tone={colors.textTertiary}>
             No activity on this card yet.
           </AppText>
         ) : (
@@ -201,7 +207,7 @@ export default function CardDetail() {
           }
           accessibilityRole="button"
           style={styles.dangerRow}>
-          <AppText variant="body" tone={color.error}>
+          <AppText variant="body" tone={colors.error}>
             Report lost or stolen
           </AppText>
         </Pressable>
@@ -215,7 +221,7 @@ export default function CardDetail() {
           }
           accessibilityRole="button"
           style={styles.dangerRow}>
-          <AppText variant="body" tone={color.error}>
+          <AppText variant="body" tone={colors.error}>
             Close card
           </AppText>
         </Pressable>
@@ -234,13 +240,51 @@ export default function CardDetail() {
             {reveal === 'authenticating' ? (
               <View style={{ alignItems: 'center', gap: space.l, paddingVertical: space.x32 }}>
                 <AppText variant="section">Verify it's you</AppText>
-                <AppText variant="secondary" tone={color.textTertiary}>
+                <AppText variant="secondary" tone={colors.textTertiary}>
                   Confirming with Face ID…
                 </AppText>
               </View>
             ) : (
               <View style={{ gap: space.l }}>
                 <AppText variant="section">Card details</AppText>
+                {!reduceMotion ? (
+                  <View style={{ alignItems: 'center' }}>
+                    <FlipCard
+                      width={Math.min(width * 0.86, 340)}
+                      height={Math.min(width * 0.86, 340) / CARD_RATIO}
+                      borderRadius={20}
+                      initialFlipped
+                      enableHaptics={false}
+                      animationDuration={400}>
+                      <FlipCard.Front>
+                        <PaymentCardVisual card={card} member={member} width={Math.min(width * 0.86, 340)} />
+                      </FlipCard.Front>
+                      <FlipCard.Back>
+                        {reveal === 'shown' ? (
+                          <View style={[styles.credBox, { flex: 1, justifyContent: 'center' }]}>
+                            {(
+                              [
+                                ['Number', sensitive?.cardNumber ?? '—'],
+                                ['Expiry', sensitive?.expiry ?? '—'],
+                                ['CVV', sensitive?.cvv ?? '—'],
+                              ] as const
+                            ).map(([label, value]) => (
+                              <View key={label} style={styles.credRow}>
+                                <AppText variant="secondary" tone={colors.textTertiary}>
+                                  {label}
+                                </AppText>
+                                <AppText variant="body" tabular style={{ fontFamily: font.medium, letterSpacing: 1 }}>
+                                  {value}
+                                </AppText>
+                              </View>
+                            ))}
+                          </View>
+                        ) : null}
+                      </FlipCard.Back>
+                    </FlipCard>
+                  </View>
+                ) : null}
+                <View accessibilityViewIsModal>
                 <View style={styles.credBox}>
                   {(
                     [
@@ -251,7 +295,7 @@ export default function CardDetail() {
                     ] as const
                   ).map(([label, value]) => (
                     <View key={label} style={styles.credRow}>
-                      <AppText variant="secondary" tone={color.textTertiary}>
+                      <AppText variant="secondary" tone={colors.textTertiary}>
                         {label}
                       </AppText>
                       <AppText variant="body" tabular style={{ fontFamily: font.medium, letterSpacing: 1 }}>
@@ -260,7 +304,8 @@ export default function CardDetail() {
                     </View>
                   ))}
                 </View>
-                <AppText variant="caption" tone={color.textTertiary}>
+                </View>
+                <AppText variant="caption" tone={colors.textTertiary}>
                   Served by the card provider; each view is audited. Details hide when you close this sheet and are
                   never shared with the AI assistant.
                 </AppText>
@@ -268,7 +313,7 @@ export default function CardDetail() {
               </View>
             )}
             {reveal === 'authenticating' ? (
-              <TextButton label="Cancel" tone={color.textSecondary} onPress={closeReveal} />
+              <TextButton label="Cancel" tone={colors.textSecondary} onPress={closeReveal} />
             ) : null}
           </View>
         </View>
@@ -277,7 +322,8 @@ export default function CardDetail() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ColorTokens) {
+  return StyleSheet.create({
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -294,7 +340,7 @@ const styles = StyleSheet.create({
   },
   dangerPanel: {
     padding: 0,
-    borderColor: color.errorDim,
+    borderColor: colors.errorDim,
     marginTop: space.s,
   },
   dangerRow: {
@@ -303,19 +349,19 @@ const styles = StyleSheet.create({
   },
   dangerDivider: {
     height: 1,
-    backgroundColor: color.borderSoft,
+    backgroundColor: colors.borderSoft,
   },
   sheetBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(2, 4, 3, 0.72)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: color.surface3,
+    backgroundColor: colors.raised,
     borderTopLeftRadius: radius.sheet,
     borderTopRightRadius: radius.sheet,
     borderWidth: 1,
-    borderColor: color.borderStrong,
+    borderColor: colors.lineStrong,
     paddingHorizontal: space.xl,
     paddingTop: space.m,
   },
@@ -324,14 +370,14 @@ const styles = StyleSheet.create({
     width: 38,
     height: 4,
     borderRadius: 2,
-    backgroundColor: color.borderStrong,
+    backgroundColor: colors.inset,
     marginBottom: space.l,
   },
   credBox: {
     gap: 14,
-    backgroundColor: color.surface1,
+    backgroundColor: colors.cream,
     borderWidth: 1,
-    borderColor: color.mintBorder,
+    borderColor: colors.line,
     borderRadius: 16,
     padding: space.xl,
   },
@@ -341,3 +387,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+}
+

@@ -6,7 +6,8 @@ import { ApprovalFlow } from '@/components/fin/ApprovalFlow';
 import { Screen, ScreenHeader } from '@/components/fin/Screen';
 import { Segments } from '@/components/fin/Segments';
 import { AppText } from '@/design/AppText';
-import { color, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { space } from '@/design/tokens';
 import { memberRemaining, useDomain } from '@/domain/store';
 
 // Approval Center (spec §29, UI §21): pending requests with Approve
@@ -16,6 +17,7 @@ type Filter = 'pending' | 'completed';
 
 export default function ApprovalCenter() {
   const { state } = useDomain();
+  const colors = useColors();
   const [filter, setFilter] = useState<Filter>('pending');
 
   const pending = state.approvals.filter((a) => a.status === 'pending');
@@ -38,7 +40,7 @@ export default function ApprovalCenter() {
 
       {shown.length === 0 ? (
         <View style={styles.empty}>
-          <AppText variant="body" tone={color.textSecondary}>
+          <AppText variant="body" tone={colors.textSecondary}>
             {filter === 'pending' ? "You're all caught up." : 'No completed approvals yet.'}
           </AppText>
         </View>

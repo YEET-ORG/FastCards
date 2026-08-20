@@ -1,15 +1,13 @@
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/design/AppText';
-import { color, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { space } from '@/design/tokens';
 import { formatMoney, relativeTime } from '@/domain/money';
 import type { Approval, Member } from '@/domain/types';
 
 import { PrimaryButton, SecondaryButton, TextButton } from './Buttons';
 import { Avatar, StatusBadge } from './primitives';
-
-// ApprovalCard (spec §29, UI §21-22): Approve once and Change rule are
-// deliberately separate controls — never one ambiguous action.
 
 export function ApprovalCard({
   approval,
@@ -26,17 +24,27 @@ export function ApprovalCard({
   onDecline?: () => void;
   onChangeRule?: () => void;
 }) {
+  const colors = useColors();
   const resolved = approval.status !== 'pending';
+  const hue = requester ? (colors.member[requester.hueId] ?? colors.member.pool) : colors.member.pool;
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: colors.raised, borderColor: colors.lineStrong }]}>
       <View style={styles.topRow}>
-        {requester ? <Avatar initials={requester.initials} accent={requester.accentColor} size={38} /> : null}
+        {requester ? (
+          <Avatar
+            initials={requester.initials}
+            name={requester.name}
+            backgroundColor={hue.dim}
+            textColor={hue.ink}
+            size={38}
+          />
+        ) : null}
         <View style={{ flex: 1, gap: 1 }}>
           <AppText variant="cardTitle">
             {requester?.name ?? 'Member'} · {approval.merchant}
           </AppText>
-          <AppText variant="secondary" tone={color.textTertiary}>
+          <AppText variant="secondary" tone={colors.textTertiary}>
             {relativeTime(approval.requestedAt)} · {approval.expiryNote}
           </AppText>
         </View>
@@ -48,7 +56,7 @@ export function ApprovalCard({
       <View style={styles.factRow}>
         <AppText variant="secondary">{approval.reason}</AppText>
         {remainingBudget !== undefined ? (
-          <AppText variant="secondary" tone={color.textTertiary}>
+          <AppText variant="secondary" tone={colors.textTertiary}>
             {formatMoney(remainingBudget)} left in {requester?.name ?? 'member'}'s monthly budget
           </AppText>
         ) : null}
@@ -69,7 +77,7 @@ export function ApprovalCard({
             <PrimaryButton label="Approve once" onPress={onApprove} style={styles.actionBtn} />
             <SecondaryButton label="Decline" onPress={onDecline} style={styles.actionBtn} />
           </View>
-          <View style={styles.changeRule}>
+          <View style={[styles.changeRule, { borderTopColor: colors.line }]}>
             <TextButton label="Change future rule instead" onPress={onChangeRule} />
           </View>
         </>
@@ -80,9 +88,7 @@ export function ApprovalCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: color.surface2,
     borderWidth: 1,
-    borderColor: color.borderStrong,
     borderRadius: 18,
     padding: space.l,
     gap: space.m,
@@ -101,11 +107,10 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 50,
   },
   changeRule: {
     borderTopWidth: 1,
-    borderTopColor: color.borderSoft,
     paddingTop: space.xs,
     alignItems: 'center',
   },

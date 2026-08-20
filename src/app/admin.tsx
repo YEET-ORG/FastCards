@@ -9,7 +9,8 @@ import { StatusBadge, type BadgeStatus } from '@/components/fin/primitives';
 import { Panel, ScreenHeader } from '@/components/fin/Screen';
 import { useToast } from '@/components/fin/Toast';
 import { AppText } from '@/design/AppText';
-import { color, font, radius, screenPad, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { font, radius, screenPad, space, type ColorTokens } from '@/design/tokens';
 
 // Admin console — the human bridge between the two pools. Shows the
 // provider (KripiCard) USD float, the KYC queue, and the card-order
@@ -35,6 +36,8 @@ const orderBadge = (status: string): BadgeStatus =>
 export default function AdminScreen() {
   const { headers, session } = useAuth();
   const toast = useToast();
+  const colors = useColors();
+  const styles = makeStyles(colors);
   const insets = useSafeAreaInsets();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [float, setFloat] = useState<number | null>(null);
@@ -85,7 +88,7 @@ export default function AdminScreen() {
       </View>
       <ScrollView
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={color.mint} />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} tintColor={colors.accent} />}
         showsVerticalScrollIndicator={false}>
         {/* Provider pool */}
         <Panel style={{ gap: space.m }}>
@@ -99,7 +102,7 @@ export default function AdminScreen() {
               onChangeText={setFloatInput}
               keyboardType="decimal-pad"
               placeholder="New balance in $"
-              placeholderTextColor={color.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               style={styles.floatInput}
               accessibilityLabel="Provider pool balance"
             />
@@ -114,7 +117,7 @@ export default function AdminScreen() {
               style={{ minHeight: 44 }}
             />
           </View>
-          <AppText variant="caption" tone={color.textTertiary}>
+          <AppText variant="caption" tone={colors.textTertiary}>
             Mirror of the USD balance held at the card provider. Approvals are blocked when a card would exceed it.
           </AppText>
         </Panel>
@@ -123,7 +126,7 @@ export default function AdminScreen() {
         <View style={{ gap: space.m }}>
           <AppText variant="section">KYC queue</AppText>
           {kycQueue.length === 0 ? (
-            <AppText variant="secondary" tone={color.textTertiary}>
+            <AppText variant="secondary" tone={colors.textTertiary}>
               No KYC submissions waiting.
             </AppText>
           ) : (
@@ -131,7 +134,7 @@ export default function AdminScreen() {
               <Panel key={u.id} style={styles.rowPanel}>
                 <View style={{ flex: 1 }}>
                   <AppText variant="cardTitle">{u.name}</AppText>
-                  <AppText variant="caption" tone={color.textTertiary}>
+                  <AppText variant="caption" tone={colors.textTertiary}>
                     {u.id}
                   </AppText>
                 </View>
@@ -154,7 +157,7 @@ export default function AdminScreen() {
         <View style={{ gap: space.m }}>
           <AppText variant="section">Card orders</AppText>
           {orders.length === 0 ? (
-            <AppText variant="secondary" tone={color.textTertiary}>
+            <AppText variant="secondary" tone={colors.textTertiary}>
               No orders yet.
             </AppText>
           ) : (
@@ -165,11 +168,11 @@ export default function AdminScreen() {
                     <AppText variant="cardTitle">
                       {o.nickname} · {o.user_name}
                     </AppText>
-                    <AppText variant="caption" tone={color.textTertiary}>
+                    <AppText variant="caption" tone={colors.textTertiary}>
                       ${o.price_usd} · {o.expected_units} units · memo {o.memo}
                     </AppText>
                     {o.review_note ? (
-                      <AppText variant="caption" tone={color.warning}>
+                      <AppText variant="caption" tone={colors.warning}>
                         {o.review_note}
                       </AppText>
                     ) : null}
@@ -217,10 +220,11 @@ export default function AdminScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ColorTokens) {
+  return StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: color.bg,
+    backgroundColor: colors.bg,
   },
   scroll: {
     paddingHorizontal: screenPad,
@@ -233,11 +237,11 @@ const styles = StyleSheet.create({
   },
   floatInput: {
     flex: 1,
-    backgroundColor: color.surface2,
+    backgroundColor: colors.surface2,
     borderWidth: 1,
-    borderColor: color.borderSoft,
+    borderColor: colors.borderSoft,
     borderRadius: radius.control,
-    color: color.textPrimary,
+    color: colors.textPrimary,
     fontFamily: font.medium,
     fontSize: 15,
     paddingHorizontal: space.l,
@@ -262,3 +266,5 @@ const styles = StyleSheet.create({
     gap: space.l,
   },
 });
+}
+

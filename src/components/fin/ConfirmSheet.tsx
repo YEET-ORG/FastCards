@@ -4,14 +4,12 @@ import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useAskDockOptional } from '@/components/ask/AskDockContext';
 import { AppText } from '@/design/AppText';
-import { color, radius, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { radius, space } from '@/design/tokens';
 
 import { PrimaryButton, TextButton } from './Buttons';
-
-// Trusted confirmation surface (spec §69, UI §57). Immutable facts come
-// from domain state, the CTA names the consequence, and the button locks
-// on first tap so a double-tap can never execute twice.
 
 export interface ConfirmFact {
   label: string;
@@ -41,19 +39,23 @@ export function ConfirmSheet({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
+  const dock = useAskDockOptional();
   const [phase, setPhase] = useState<'review' | 'working'>('review');
 
   useEffect(() => {
     if (visible) setPhase('review');
   }, [visible]);
 
+  useEffect(() => {
+    dock?.setVaultOpen(visible);
+    return () => dock?.setVaultOpen(false);
+  }, [visible, dock]);
+
   const handleConfirm = async () => {
-    if (phase !== 'review') return; // double-tap safety
+    if (phase !== 'review') return;
     setPhase('working');
     try {
-      // Step-up: real device biometric/passcode, bound to this exact
-      // action by the prompt. Skipped only when the device has no
-      // enrolled auth (e.g. simulators). Privy MFA replaces this later.
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const enrolled = hasHardware && (await LocalAuthentication.isEnrolledAsync());
       if (enrolled) {
@@ -76,14 +78,22 @@ export function ConfirmSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={phase === 'review' ? onClose : undefined}>
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { backgroundColor: colors.overlay }]} accessibilityViewIsModal>
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={phase === 'review' ? onClose : undefined}
           accessibilityLabel="Dismiss"
         />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + space.l }]}>
-          <View style={styles.grabber} />
+        <View
+          style={[
+            styles.sheet,
+            {
+              paddingBottom: insets.bottom + space.l,
+              backgroundColor: colors.raised,
+              borderColor: colors.lineStrong,
+            },
+          ]}>
+          <View style={[styles.grabber, { backgroundColor: colors.inset }]} />
           <AppText variant="section">{title}</AppText>
           {subject ? (
             <AppText variant="secondary" style={{ marginTop: 2 }}>
@@ -91,10 +101,10 @@ export function ConfirmSheet({
             </AppText>
           ) : null}
 
-          <View style={styles.facts}>
+          <View style={[styles.facts, { backgroundColor: colors.cream, borderColor: colors.line }]}>
             {facts.map((f) => (
               <View key={f.label} style={styles.factRow}>
-                <AppText variant="secondary" tone={color.textTertiary}>
+                <AppText variant="secondary" tone={colors.textTertiary}>
                   {f.label}
                 </AppText>
                 <AppText
@@ -108,7 +118,7 @@ export function ConfirmSheet({
           </View>
 
           {note ? (
-            <AppText variant="secondary" tone={color.textTertiary} style={{ marginBottom: space.l }}>
+            <AppText variant="secondary" tone={colors.textTertiary} style={{ marginBottom: space.l }}>
               {note}
             </AppText>
           ) : null}
@@ -117,9 +127,9 @@ export function ConfirmSheet({
             label={cta}
             loading={phase === 'working'}
             onPress={handleConfirm}
-            style={destructive ? { backgroundColor: color.error } : undefined}
+            style={destructive ? { backgroundColor: colors.error } : undefined}
           />
-          <TextButton label="Cancel" tone={color.textSecondary} onPress={phase === 'review' ? onClose : undefined} />
+          <TextButton label="Cancel" tone={colors.textSecondary} onPress={phase === 'review' ? onClose : undefined} />
         </View>
       </View>
     </Modal>
@@ -129,15 +139,12 @@ export function ConfirmSheet({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(2, 4, 3, 0.72)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: color.surface2,
     borderTopLeftRadius: radius.sheet,
     borderTopRightRadius: radius.sheet,
     borderWidth: 1,
-    borderColor: color.borderStrong,
     paddingHorizontal: space.xl,
     paddingTop: space.m,
   },
@@ -146,14 +153,11 @@ const styles = StyleSheet.create({
     width: 38,
     height: 4,
     borderRadius: 2,
-    backgroundColor: color.borderStrong,
     marginBottom: space.l,
   },
   facts: {
     gap: 10,
-    backgroundColor: color.surface1,
     borderWidth: 1,
-    borderColor: color.borderSoft,
     borderRadius: 16,
     padding: space.l,
     marginVertical: space.l,

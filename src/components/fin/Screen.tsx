@@ -1,13 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
+import { useCallback, useMemo, useRef, type RefObject } from 'react';
+import {
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/design/AppText';
-import { color, screenPad, space } from '@/design/tokens';
-
-// Global page anatomy (spec UI §1-2): Obsidian ground, safe-area aware
-// header with at most three zones, 20-24pt section rhythm.
+import { useColors } from '@/design/theme';
+import { screenPad, space } from '@/design/tokens';
 
 export function ScreenHeader({
   title,
@@ -21,6 +28,7 @@ export function ScreenHeader({
   right?: React.ReactNode;
 }) {
   const router = useRouter();
+  const colors = useColors();
   return (
     <View style={styles.header}>
       <View style={styles.headerLeft}>
@@ -31,7 +39,7 @@ export function ScreenHeader({
             accessibilityRole="button"
             accessibilityLabel="Back"
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}>
-            <Ionicons name="chevron-back" size={22} color={color.textPrimary} />
+            <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
           </Pressable>
         ) : null}
         <View style={{ flexShrink: 1 }}>
@@ -59,14 +67,19 @@ export function HeaderIconButton({
   label: string;
   onPress?: () => void;
 }) {
+  const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
       hitSlop={8}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [styles.iconBtn, pressed && { backgroundColor: color.surface2 }]}>
-      <Ionicons name={icon} size={20} color={color.textPrimary} />
+      style={({ pressed }) => [
+        styles.iconBtn,
+        { borderColor: colors.line, backgroundColor: colors.cream },
+        pressed && { backgroundColor: colors.inset },
+      ]}>
+      <Ionicons name={icon} size={20} color={colors.textPrimary} />
     </Pressable>
   );
 }
@@ -76,11 +89,38 @@ export function Screen({
   scroll = true,
   padBottom = true,
   style,
-}: React.PropsWithChildren<{ scroll?: boolean; padBottom?: boolean; style?: ViewStyle }>) {
+  onScrollDirection,
+  scrollToTopRef,
+}: React.PropsWithChildren<{
+  scroll?: boolean;
+  padBottom?: boolean;
+  style?: ViewStyle;
+  onScrollDirection?: (dir: 'up' | 'down') => void;
+  scrollToTopRef?: RefObject<ScrollView | null>;
+}>) {
   const insets = useSafeAreaInsets();
+  const colors = useColors();
+  const lastY = useRef(0);
+
+  const onScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!onScrollDirection) return;
+      const y = e.nativeEvent.contentOffset.y;
+      if (y < 0) {
+        lastY.current = 0;
+        return;
+      }
+      const dy = y - lastY.current;
+      if (dy > 12) onScrollDirection('down');
+      else if (dy < -12) onScrollDirection('up');
+      lastY.current = y;
+    },
+    [onScrollDirection],
+  );
+
   const base: ViewStyle = {
     flex: 1,
-    backgroundColor: color.bg,
+    backgroundColor: colors.bg,
     paddingTop: insets.top + space.s,
   };
   if (!scroll) {
@@ -89,10 +129,13 @@ export function Screen({
   return (
     <View style={base}>
       <ScrollView
+        ref={scrollToTopRef}
+        scrollEventThrottle={16}
+        onScroll={onScroll}
         contentContainerStyle={[
           {
             paddingHorizontal: screenPad,
-            paddingBottom: padBottom ? insets.bottom + 96 : space.xl,
+            paddingBottom: padBottom ? space.dockClearance : space.xl,
             gap: space.xl,
           },
           style,
@@ -104,9 +147,19 @@ export function Screen({
   );
 }
 
-/** Standard surface container (spec UI §3, depth level 2). */
 export function Panel({ children, style }: React.PropsWithChildren<{ style?: ViewStyle }>) {
-  return <View style={[styles.panel, style]}>{children}</View>;
+  const colors = useColors();
+  const panelStyle = useMemo(
+    () => ({
+      backgroundColor: colors.cream,
+      borderWidth: 1,
+      borderColor: colors.line,
+      borderRadius: 18,
+      padding: space.l,
+    }),
+    [colors],
+  );
+  return <View style={[panelStyle, style]}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -129,28 +182,19 @@ const styles = StyleSheet.create({
     gap: space.m,
   },
   backBtn: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: -8,
   },
   iconBtn: {
-    width: 38,
-    height: 38,
+    width: 44,
+    height: 44,
     borderRadius: 13,
     borderWidth: 1,
-    borderColor: color.borderSoft,
-    backgroundColor: color.surface1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  panel: {
-    backgroundColor: color.surface1,
-    borderWidth: 1,
-    borderColor: color.borderSoft,
-    borderRadius: 18,
-    padding: space.l,
   },
 });

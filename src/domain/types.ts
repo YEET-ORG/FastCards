@@ -1,6 +1,8 @@
 // First-class domain objects (spec §8). This is the mocked shape of the
 // financial domain backend — the AI layer never owns any of this state.
 
+import type { MemberHueId } from '@/design/tokens';
+
 export type MemberRole = 'owner' | 'admin' | 'adult' | 'teen' | 'child' | 'dependent';
 
 export interface CategoryBudget {
@@ -23,7 +25,9 @@ export interface Member {
   role: MemberRole;
   relationship?: string;
   initials: string;
-  accentColor: string;
+  hueId: MemberHueId;
+  /** @deprecated resolve via colors.member[hueId] */
+  accentColor?: string;
   monthlyLimit?: number; // undefined = no monthly limit (owner)
   spentThisMonth: number;
   tempAllowance?: TempAllowance;

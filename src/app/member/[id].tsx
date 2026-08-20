@@ -11,7 +11,8 @@ import { Panel, Screen, ScreenHeader } from '@/components/fin/Screen';
 import { useToast } from '@/components/fin/Toast';
 import { TransactionRow } from '@/components/fin/TransactionRow';
 import { AppText } from '@/design/AppText';
-import { color, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { space } from '@/design/tokens';
 import { formatMoney } from '@/domain/money';
 import { cardForMember, memberRemaining, pendingApprovals, useDomain } from '@/domain/store';
 
@@ -26,6 +27,7 @@ export default function MemberDetail() {
   const { state, dispatch } = useDomain();
   const router = useRouter();
   const toast = useToast();
+  const colors = useColors();
   const [adjusting, setAdjusting] = useState(false);
   const [proposedLimit, setProposedLimit] = useState<number | null>(null);
 
@@ -63,18 +65,24 @@ export default function MemberDetail() {
       <ScreenHeader title={member.name} subtitle={member.relationship ?? member.role} back />
 
       <View style={styles.hero}>
-        <Avatar initials={member.initials} accent={member.accentColor} size={52} />
+        <Avatar
+          initials={member.initials}
+          name={member.name}
+          backgroundColor={(colors.member[member.hueId] ?? colors.member.pool).dim}
+          textColor={(colors.member[member.hueId] ?? colors.member.pool).ink}
+          size={52}
+        />
         <View style={{ flex: 1, gap: 4 }}>
           {remaining !== undefined && effectiveLimit !== undefined ? (
             <>
               <RollingMoney amount={Math.max(remaining, 0)} fontSize={32} />
-              <AppText variant="secondary" tone={color.textTertiary}>
+              <AppText variant="secondary" tone={colors.textTertiary}>
                 of {formatMoney(effectiveLimit)} this month
               </AppText>
               <ProgressBar value={member.spentThisMonth / effectiveLimit} style={{ marginTop: 4 }} />
             </>
           ) : (
-            <AppText variant="secondary" tone={color.textTertiary}>
+            <AppText variant="secondary" tone={colors.textTertiary}>
               No monthly limit · spent {formatMoney(member.spentThisMonth)} this month
             </AppText>
           )}
@@ -135,11 +143,11 @@ export default function MemberDetail() {
             {member.categories.map((c) => (
               <View key={c.key} style={{ gap: 6 }}>
                 <View style={styles.catRow}>
-                  <AppText variant="body" tone={c.enabled ? undefined : color.textTertiary}>
+                  <AppText variant="body" tone={c.enabled ? undefined : colors.textTertiary}>
                     {c.label}
                     {!c.enabled ? '  · off' : ''}
                   </AppText>
-                  <AppText variant="secondary" tabular tone={color.textTertiary}>
+                  <AppText variant="secondary" tabular tone={colors.textTertiary}>
                     {formatMoney(c.spent)} / {formatMoney(c.cap)}
                   </AppText>
                 </View>

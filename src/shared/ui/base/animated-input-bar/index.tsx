@@ -165,7 +165,7 @@ const AnimatedInput: React.FC<IAnimatedInput> &
     characterExitDuration = 200,
     characterDelayIncrement = 30,
     blurAnimationDuration = 400,
-    blurIntensityRange = [0, 2.5, 4.5],
+    blurIntensityRange = [0, 0, 0],
     blurProgressRange = [0, 0.2, 1],
     ...props
   }: IAnimatedInput): React.ReactNode &
@@ -234,6 +234,7 @@ const AnimatedInput: React.FC<IAnimatedInput> &
               style={[styles.character, placeholderStyle] as any}
             />
           )}
+          {blurIntensityRange.some((n) => n > 0) ? (
           <AnimatedBlurView
             style={[
               StyleSheet.absoluteFill,
@@ -243,6 +244,7 @@ const AnimatedInput: React.FC<IAnimatedInput> &
             ]}
             animatedProps={animatedBlurViewProps}
           />
+          ) : null}
           <TextInput
             style={[styles.input, inputStyle]}
             value={inputValue}

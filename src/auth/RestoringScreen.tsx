@@ -1,18 +1,20 @@
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/design/AppText';
-import { color, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { space } from '@/design/tokens';
 
 /** Shown while a stored session (Privy or dev) is being restored at boot —
  * keeps the sign-in screen from flashing for already-logged-in users. */
 export function RestoringScreen() {
+  const colors = useColors();
   return (
-    <View style={styles.root}>
-      <AppText variant="label" tone={color.mint}>
+    <View style={[styles.root, { backgroundColor: colors.bg }]}>
+      <AppText variant="label" tone={colors.accentInk}>
         FASTCARDS
       </AppText>
-      <ActivityIndicator color={color.mint} />
-      <AppText variant="secondary" tone={color.textTertiary}>
+      <ActivityIndicator color={colors.accent} />
+      <AppText variant="secondary" tone={colors.textTertiary}>
         Restoring your session…
       </AppText>
     </View>
@@ -22,7 +24,6 @@ export function RestoringScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: color.bg,
     alignItems: 'center',
     justifyContent: 'center',
     gap: space.l,

@@ -2,12 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/design/AppText';
-import { color, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { space } from '@/design/tokens';
 
 import { TextButton } from './Buttons';
-
-// AI Insight Card (spec UI §7): eyebrow, one clear statement, up to three
-// supporting rows, at most two actions. Dismissible (spec §17.3).
 
 export function InsightCard({
   statement,
@@ -20,18 +18,19 @@ export function InsightCard({
   actions?: { label: string; onPress: () => void }[];
   onDismiss?: () => void;
 }) {
+  const colors = useColors();
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: colors.cream, borderColor: colors.line }]}>
       <View style={styles.eyebrowRow}>
         <View style={styles.eyebrow}>
-          <Ionicons name="sparkles-outline" size={13} color={color.mint} />
-          <AppText variant="label" tone={color.mint}>
+          <Ionicons name="sparkles-outline" size={13} color={colors.mintInk} />
+          <AppText variant="label" tone={colors.mintInk}>
             AI Insight
           </AppText>
         </View>
         {onDismiss ? (
           <Pressable onPress={onDismiss} hitSlop={10} accessibilityRole="button" accessibilityLabel="Dismiss insight">
-            <Ionicons name="close" size={16} color={color.textTertiary} />
+            <Ionicons name="close" size={16} color={colors.textTertiary} />
           </Pressable>
         ) : null}
       </View>
@@ -39,10 +38,10 @@ export function InsightCard({
       <AppText variant="body">{statement}</AppText>
 
       {rows && rows.length > 0 ? (
-        <View style={styles.rows}>
+        <View style={[styles.rows, { borderTopColor: colors.line }]}>
           {rows.slice(0, 3).map((r) => (
             <View key={r.label} style={styles.row}>
-              <AppText variant="secondary" tone={color.textTertiary}>
+              <AppText variant="secondary" tone={colors.textTertiary}>
                 {r.label}
               </AppText>
               <AppText variant="secondary" tabular>
@@ -66,9 +65,7 @@ export function InsightCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: color.surface1,
     borderWidth: 1,
-    borderColor: color.borderSoft,
     borderRadius: 18,
     padding: space.l,
     gap: space.m,
@@ -86,7 +83,6 @@ const styles = StyleSheet.create({
   rows: {
     gap: 6,
     borderTopWidth: 1,
-    borderTopColor: color.borderSoft,
     paddingTop: space.m,
   },
   row: {

@@ -1,23 +1,33 @@
 import { Tabs } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
-import { KastTabBar } from '@/components/fin/KastTabBar';
-import { color } from '@/design/tokens';
-
-// Four destinations only (spec §7): Ask · Cards · Family · Activity —
-// rendered by the Reacticx morphing tab bar.
+import { AskDock } from '@/components/ask/AskDock';
+import { AskDockProvider } from '@/components/ask/AskDockContext';
+import { HouseholdTabBar } from '@/components/fin/HouseholdTabBar';
+import { useColors } from '@/design/theme';
 
 export default function TabLayout() {
+  const colors = useColors();
   return (
-    <Tabs
-      tabBar={(props) => <KastTabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-        sceneStyle: { backgroundColor: color.bg },
-      }}>
-      <Tabs.Screen name="index" options={{ title: 'Ask' }} />
-      <Tabs.Screen name="cards" options={{ title: 'Cards' }} />
-      <Tabs.Screen name="family" options={{ title: 'Family' }} />
-      <Tabs.Screen name="activity" options={{ title: 'Activity' }} />
-    </Tabs>
+    <AskDockProvider>
+      <View style={styles.root}>
+        <Tabs
+          tabBar={(props) => <HouseholdTabBar {...props} />}
+          screenOptions={{
+            headerShown: false,
+            sceneStyle: { backgroundColor: colors.bg },
+          }}>
+          <Tabs.Screen name="index" options={{ title: 'Ask' }} />
+          <Tabs.Screen name="cards" options={{ title: 'Cards' }} />
+          <Tabs.Screen name="family" options={{ title: 'Family' }} />
+          <Tabs.Screen name="activity" options={{ title: 'Activity' }} />
+        </Tabs>
+        <AskDock />
+      </View>
+    </AskDockProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});

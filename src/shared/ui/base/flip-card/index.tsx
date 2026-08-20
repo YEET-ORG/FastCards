@@ -49,11 +49,12 @@ export const FlipCard: React.FC<FlipCardProps> & {
   onFlip,
   blurTint,
   scaleOnPress = true,
+  initialFlipped = false,
 }: FlipCardProps):
   | (React.ReactElement & React.ReactNode & React.JSX.Element)
   | null => {
-  const [isFlipped, setIsFlipped] = useState<boolean>(false);
-  const rotation = useSharedValue<number>(0);
+  const [isFlipped, setIsFlipped] = useState<boolean>(initialFlipped);
+  const rotation = useSharedValue<number>(initialFlipped ? 180 : 0);
   const scale = useSharedValue<number>(1);
 
   const flip = () => {

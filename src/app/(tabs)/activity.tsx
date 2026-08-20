@@ -1,20 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 
+import { useAskDock } from '@/components/ask/AskDockContext';
 import { HeaderIconButton, Screen, ScreenHeader } from '@/components/fin/Screen';
 import { Segments } from '@/components/fin/Segments';
 import { TransactionRow } from '@/components/fin/TransactionRow';
 import { AppText } from '@/design/AppText';
-import { color, font, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { font, space } from '@/design/tokens';
 import { dayLabel, formatMoney, relativeTime } from '@/domain/money';
 import { useDomain } from '@/domain/store';
 import type { AuditEvent, Transaction } from '@/domain/types';
-
-// Activity (spec §30, UI §23): the universal event ledger. Card
-// transactions and audit events (AI actions, rule changes, freezes,
-// approvals, security) share one chronological feed.
 
 type Filter = 'all' | 'mine' | 'family' | 'ai';
 const FILTERS: Filter[] = ['all', 'mine', 'family', 'ai'];
@@ -35,7 +33,17 @@ const eventIcons: Record<AuditEvent['kind'], keyof typeof Ionicons.glyphMap> = {
 export default function ActivityFeed() {
   const { state } = useDomain();
   const router = useRouter();
+  const colors = useColors();
+  const dock = useAskDock();
+  const scrollRef = useRef<ScrollView>(null);
   const [filter, setFilter] = useState<Filter>('all');
+
+  useFocusEffect(
+    useCallback(() => {
+      dock.registerScrollToTop('activity', () => scrollRef.current?.scrollTo({ y: 0, animated: true }));
+      return () => dock.registerScrollToTop('activity', null);
+    }, [dock]),
+  );
 
   const feed = useMemo(() => {
     const items: FeedItem[] = [
@@ -53,7 +61,6 @@ export default function ActivityFeed() {
 
     filtered.sort((a, b) => b.at.localeCompare(a.at));
 
-    // Group into day buckets
     const groups: { label: string; items: FeedItem[] }[] = [];
     for (const item of filtered) {
       const label = dayLabel(item.at);
@@ -65,7 +72,7 @@ export default function ActivityFeed() {
   }, [state.transactions, state.events, filter]);
 
   return (
-    <Screen>
+    <Screen scrollToTopRef={scrollRef} onScrollDirection={dock.reportScroll}>
       <ScreenHeader
         title="Activity"
         right={
@@ -85,7 +92,7 @@ export default function ActivityFeed() {
 
       {feed.length === 0 ? (
         <View style={styles.empty}>
-          <AppText variant="body" tone={color.textSecondary}>
+          <AppText variant="body" tone={colors.textSecondary}>
             Your activity will appear here.
           </AppText>
         </View>
@@ -101,17 +108,15 @@ export default function ActivityFeed() {
                   key={item.txn.id}
                   txn={item.txn}
                   member={state.members.find((m) => m.id === item.txn.memberId)}
-                  onPress={() =>
-                    router.push({ pathname: '/transaction/[id]', params: { id: item.txn.id } })
-                  }
+                  onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: item.txn.id } })}
                 />
               ) : (
                 <View key={item.event.id} style={styles.eventRow}>
-                  <View style={styles.eventIcon}>
+                  <View style={[styles.eventIcon, { backgroundColor: colors.cream, borderColor: colors.line }]}>
                     <Ionicons
                       name={eventIcons[item.event.kind]}
                       size={16}
-                      color={item.event.kind === 'ai_action' ? color.mint : color.textSecondary}
+                      color={item.event.kind === 'ai_action' ? colors.mintInk : colors.textSecondary}
                     />
                   </View>
                   <View style={{ flex: 1, gap: 1 }}>
@@ -119,7 +124,7 @@ export default function ActivityFeed() {
                       {item.event.title}
                     </AppText>
                     {item.event.subtitle ? (
-                      <AppText variant="secondary" tone={color.textTertiary} numberOfLines={1}>
+                      <AppText variant="secondary" tone={colors.textTertiary} numberOfLines={1}>
                         {item.event.subtitle}
                       </AppText>
                     ) : null}
@@ -157,9 +162,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 13,
-    backgroundColor: color.surface1,
     borderWidth: 1,
-    borderColor: color.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },

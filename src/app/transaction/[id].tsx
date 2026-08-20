@@ -6,7 +6,8 @@ import { SecondaryButton } from '@/components/fin/Buttons';
 import { StatusBadge } from '@/components/fin/primitives';
 import { Panel, Screen, ScreenHeader } from '@/components/fin/Screen';
 import { AppText } from '@/design/AppText';
-import { color, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { space, type ColorTokens } from '@/design/tokens';
 import { exactTime, formatSigned } from '@/domain/money';
 import { useDomain } from '@/domain/store';
 
@@ -18,6 +19,8 @@ export default function TransactionDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state } = useDomain();
   const router = useRouter();
+  const colors = useColors();
+  const styles = makeStyles(colors);
 
   const txn = state.transactions.find((t) => t.id === id);
   if (!txn) {
@@ -48,10 +51,10 @@ export default function TransactionDetail() {
       {/* Hero */}
       <View style={styles.hero}>
         <View style={styles.merchantIcon}>
-          <Ionicons name="storefront-outline" size={22} color={color.textSecondary} />
+          <Ionicons name="storefront-outline" size={22} color={colors.textSecondary} />
         </View>
         <AppText variant="section">{txn.merchant}</AppText>
-        <AppText variant="hero" tabular tone={declined ? color.textTertiary : undefined}>
+        <AppText variant="hero" tabular tone={declined ? colors.textTertiary : undefined}>
           {formatSigned(txn.amount, txn.direction)}
         </AppText>
         <StatusBadge
@@ -62,12 +65,12 @@ export default function TransactionDetail() {
 
       {/* Rule / approval context */}
       {declined && txn.declineReason ? (
-        <Panel style={{ borderColor: color.errorDim, gap: space.s }}>
-          <AppText variant="label" tone={color.error}>
+        <Panel style={{ borderColor: colors.errorDim, gap: space.s }}>
+          <AppText variant="label" tone={colors.error}>
             Why it was declined
           </AppText>
           <AppText variant="body">{txn.declineReason}.</AppText>
-          <AppText variant="secondary" tone={color.textTertiary}>
+          <AppText variant="secondary" tone={colors.textTertiary}>
             No money left the account. You can change this rule from the card's Rules screen.
           </AppText>
           {card ? (
@@ -80,8 +83,8 @@ export default function TransactionDetail() {
       ) : null}
 
       {txn.approvedBy ? (
-        <Panel style={{ borderColor: color.mintBorder, gap: space.xs }}>
-          <AppText variant="label" tone={color.mint}>
+        <Panel style={{ borderColor: colors.mintBorder, gap: space.xs }}>
+          <AppText variant="label" tone={colors.mint}>
             Approval
           </AppText>
           <AppText variant="body">
@@ -94,7 +97,7 @@ export default function TransactionDetail() {
       <Panel style={{ gap: 12 }}>
         {meta.map((m) => (
           <View key={m.label} style={styles.metaRow}>
-            <AppText variant="secondary" tone={color.textTertiary}>
+            <AppText variant="secondary" tone={colors.textTertiary}>
               {m.label}
             </AppText>
             <AppText variant="secondary" tabular style={{ flexShrink: 1, textAlign: 'right' }}>
@@ -124,7 +127,8 @@ export default function TransactionDetail() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors: ColorTokens) {
+  return StyleSheet.create({
   hero: {
     alignItems: 'center',
     gap: space.s,
@@ -134,9 +138,9 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 18,
-    backgroundColor: color.surface2,
+    backgroundColor: colors.surface2,
     borderWidth: 1,
-    borderColor: color.borderSoft,
+    borderColor: colors.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -146,3 +150,5 @@ const styles = StyleSheet.create({
     gap: space.l,
   },
 });
+}
+

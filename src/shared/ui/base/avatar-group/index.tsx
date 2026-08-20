@@ -104,7 +104,7 @@ const AnimatedAvatar: React.FC<IAnimatedAvatar> &
               width: size,
               height: size,
               borderRadius: size / 2,
-              backgroundColor: getColorFromString(avatar.name || avatar.id),
+              backgroundColor: avatar.color ?? getColorFromString(avatar.name || avatar.id),
             },
             nameOpacity,
           ]}

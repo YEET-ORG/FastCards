@@ -18,9 +18,10 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
-import { PrimaryButton } from '@/components/fin/Buttons';
+import { PrimaryButton, TextButton } from '@/components/fin/Buttons';
 import { AppText } from '@/design/AppText';
-import { color, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { space } from '@/design/tokens';
 import { Toast } from '@/shared/ui/molecules/Toast';
 
 import type { DomainState } from './types';
@@ -46,7 +47,7 @@ const DomainContext = createContext<DomainContextValue | null>(null);
 
 const showError = (e: unknown) => {
   const message = e instanceof ApiError ? e.message : 'Network problem — nothing has changed.';
-  Toast.show(message, { type: 'default', position: 'bottom', backgroundColor: color.surface3 });
+  Toast.show(message, { type: 'default', position: 'bottom' });
 };
 
 export function DomainProvider({ children }: React.PropsWithChildren) {
@@ -147,27 +148,10 @@ export function DomainProvider({ children }: React.PropsWithChildren) {
   );
 
   if (error) {
-    return (
-      <View style={styles.fill}>
-        <AppText variant="section" style={{ textAlign: 'center' }}>
-          Can't reach the server
-        </AppText>
-        <AppText variant="secondary" tone={color.textTertiary} style={{ textAlign: 'center' }}>
-          {error}
-        </AppText>
-        <PrimaryButton label="Retry" onPress={() => void refresh()} style={{ minWidth: 160 }} />
-      </View>
-    );
+    return <DomainGateError message={error} onRetry={() => void refresh()} />;
   }
   if (!value) {
-    return (
-      <View style={styles.fill}>
-        <ActivityIndicator color={color.mint} />
-        <AppText variant="secondary" tone={color.textTertiary}>
-          Loading your money…
-        </AppText>
-      </View>
-    );
+    return <DomainGateLoading />;
   }
   return <DomainContext.Provider value={value}>{children}</DomainContext.Provider>;
 }
@@ -197,10 +181,38 @@ export function pendingApprovals(state: DomainState) {
   return state.approvals.filter((a) => a.status === 'pending');
 }
 
+function DomainGateLoading() {
+  const colors = useColors();
+  return (
+    <View style={[styles.fill, { backgroundColor: colors.bg }]}>
+      <ActivityIndicator color={colors.accent} />
+      <AppText variant="secondary" tone={colors.textTertiary}>
+        Loading your money…
+      </AppText>
+    </View>
+  );
+}
+
+function DomainGateError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const colors = useColors();
+  const { signOut } = useAuth();
+  return (
+    <View style={[styles.fill, { backgroundColor: colors.bg }]}>
+      <AppText variant="section" style={{ textAlign: 'center' }}>
+        Can't reach the server
+      </AppText>
+      <AppText variant="secondary" tone={colors.textTertiary} style={{ textAlign: 'center' }}>
+        {message}
+      </AppText>
+      <PrimaryButton label="Retry" onPress={onRetry} style={{ minWidth: 160 }} />
+      <TextButton label="Sign out" destructive onPress={signOut} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   fill: {
     flex: 1,
-    backgroundColor: color.bg,
     alignItems: 'center',
     justifyContent: 'center',
     gap: space.l,

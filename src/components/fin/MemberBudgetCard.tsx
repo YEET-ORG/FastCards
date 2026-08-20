@@ -1,14 +1,12 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/design/AppText';
-import { color, space } from '@/design/tokens';
+import { useColors } from '@/design/theme';
+import { space } from '@/design/tokens';
 import { formatMoney } from '@/domain/money';
 import type { Member } from '@/domain/types';
 
 import { Avatar, ProgressBar, RuleChip, StatusBadge } from './primitives';
-
-// MemberBudgetCard (spec UI §18): remaining spending power leads; red is
-// reserved for breach/blocked, warning only near the limit.
 
 export function MemberBudgetCard({
   member,
@@ -21,6 +19,8 @@ export function MemberBudgetCard({
   hasPendingApproval?: boolean;
   onPress?: () => void;
 }) {
+  const colors = useColors();
+  const hue = colors.member[member.hueId] ?? colors.member.pool;
   const limit = member.monthlyLimit;
   const effectiveLimit = limit !== undefined ? limit + (member.tempAllowance?.amount ?? 0) : undefined;
   const remaining = effectiveLimit !== undefined ? effectiveLimit - member.spentThisMonth : undefined;
@@ -35,12 +35,21 @@ export function MemberBudgetCard({
           ? `${member.name}, ${formatMoney(remaining)} left of ${formatMoney(effectiveLimit ?? 0)}`
           : member.name
       }
-      style={({ pressed }) => [styles.card, pressed && { backgroundColor: color.surface2 }]}>
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: colors.cream, borderColor: colors.line },
+        pressed && { backgroundColor: colors.raised },
+      ]}>
       <View style={styles.topRow}>
-        <Avatar initials={member.initials} accent={member.accentColor} />
+        <Avatar
+          initials={member.initials}
+          name={member.name}
+          backgroundColor={hue.dim}
+          textColor={hue.ink}
+        />
         <View style={styles.nameBlock}>
           <AppText variant="cardTitle">{member.name}</AppText>
-          <AppText variant="secondary" tone={color.textTertiary}>
+          <AppText variant="secondary" tone={colors.textTertiary}>
             {member.relationship ?? (member.role === 'owner' ? 'Owner' : member.role)}
           </AppText>
         </View>
@@ -55,7 +64,7 @@ export function MemberBudgetCard({
           <View style={styles.amountRow}>
             <AppText variant="body" tabular>
               {formatMoney(Math.max(remaining, 0))}{' '}
-              <AppText variant="secondary" tone={color.textTertiary}>
+              <AppText variant="secondary" tone={colors.textTertiary}>
                 left of {formatMoney(effectiveLimit)}
               </AppText>
             </AppText>
@@ -69,7 +78,7 @@ export function MemberBudgetCard({
           <ProgressBar value={usage} />
         </View>
       ) : (
-        <AppText variant="secondary" tone={color.textTertiary}>
+        <AppText variant="secondary" tone={colors.textTertiary}>
           No monthly limit · spent {formatMoney(member.spentThisMonth)} this month
         </AppText>
       )}
@@ -79,9 +88,7 @@ export function MemberBudgetCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: color.surface1,
     borderWidth: 1,
-    borderColor: color.borderSoft,
     borderRadius: 18,
     padding: space.l,
     gap: space.m,
