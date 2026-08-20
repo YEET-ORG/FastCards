@@ -9,9 +9,11 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#070908",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.fastcards.app"
     },
     "android": {
+      "package": "com.fastcards.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

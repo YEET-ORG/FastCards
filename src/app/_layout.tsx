@@ -76,7 +76,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={StyleSheet.absoluteFill}>
       <ThemeProvider value={obsidianTheme}>
-        <PrivyProvider appId={PRIVY_APP_ID} clientId={PRIVY_CLIENT_ID}>
+        <PrivyProvider appId={PRIVY_APP_ID} {...(PRIVY_CLIENT_ID ? { clientId: PRIVY_CLIENT_ID } : {})}>
           <AuthProvider>
             <ToastProvider>
               <StatusBar style="light" />
