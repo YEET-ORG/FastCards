@@ -21,6 +21,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AuthProvider, useAuth } from '@/auth/AuthContext';
 import { PRIVY_APP_ID, PRIVY_CLIENT_ID } from '@/auth/privyConfig';
+import { RestoringScreen } from '@/auth/RestoringScreen';
 import { SignInScreen } from '@/auth/SignInScreen';
 import { ToastProvider } from '@/components/fin/Toast';
 import { color } from '@/design/tokens';
@@ -41,7 +42,8 @@ const obsidianTheme = {
 };
 
 function Gate() {
-  const { session } = useAuth();
+  const { session, restoring } = useAuth();
+  if (restoring) return <RestoringScreen />;
   if (!session) return <SignInScreen />;
   return (
     <DomainProvider>

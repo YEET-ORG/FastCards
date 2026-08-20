@@ -17,7 +17,7 @@ import { color, screenPad, space } from '@/design/tokens';
 type Step = 'idle' | 'email' | 'code';
 
 export function SignInScreen() {
-  const { signInDev, privyError } = useAuth();
+  const { signInDev, privyError, retryPrivy } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState<Step>('idle');
@@ -195,9 +195,18 @@ export function SignInScreen() {
         ) : null}
 
         {shownError ? (
-          <AppText variant="secondary" tone={color.error} accessibilityLiveRegion="polite">
-            {shownError}
-          </AppText>
+          <View style={{ gap: space.s }}>
+            <AppText variant="secondary" tone={color.error} accessibilityLiveRegion="polite">
+              {shownError}
+            </AppText>
+            {privyError ? (
+              <Pressable onPress={retryPrivy} accessibilityRole="button" style={styles.linkBtn}>
+                <AppText variant="secondary" tone={color.mint}>
+                  Try again
+                </AppText>
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
       </View>
     </View>
