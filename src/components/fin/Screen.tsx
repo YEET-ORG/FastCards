@@ -12,9 +12,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useAskDockOptional } from '@/components/ask/AskDockContext';
+import { PressableSurface } from '@/components/fin/primitives';
 import { AppText } from '@/design/AppText';
-import { useColors } from '@/design/theme';
-import { screenPad, space } from '@/design/tokens';
+import { useColors, useDepth } from '@/design/theme';
+import { radius, screenPad, space } from '@/design/tokens';
 
 export function ScreenHeader({
   title,
@@ -62,25 +64,32 @@ export function HeaderIconButton({
   icon,
   label,
   onPress,
+  size = 44,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   onPress?: () => void;
+  size?: number;
 }) {
   const colors = useColors();
   return (
-    <Pressable
+    <PressableSurface
+      level="raise1"
       onPress={onPress}
-      hitSlop={8}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [
-        styles.iconBtn,
-        { borderColor: colors.line, backgroundColor: colors.cream },
-        pressed && { backgroundColor: colors.inset },
+      style={[
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        { backgroundColor: colors.raised },
       ]}>
-      <Ionicons name={icon} size={20} color={colors.textPrimary} />
-    </Pressable>
+      <Ionicons name={icon} size={size <= 40 ? 19 : 20} color={colors.iconPrimary} />
+    </PressableSurface>
   );
 }
 
@@ -100,6 +109,7 @@ export function Screen({
 }>) {
   const insets = useSafeAreaInsets();
   const colors = useColors();
+  const dock = useAskDockOptional();
   const lastY = useRef(0);
 
   const onScroll = useCallback(
@@ -135,7 +145,8 @@ export function Screen({
         contentContainerStyle={[
           {
             paddingHorizontal: screenPad,
-            paddingBottom: padBottom ? space.dockClearance : space.xl,
+            // Measured nav height, not a fixed constant — see AskDockContext.
+            paddingBottom: padBottom ? (dock?.tabBarHeight ?? space.dockClearance) + space.l : space.xl,
             gap: space.xl,
           },
           style,
@@ -149,15 +160,17 @@ export function Screen({
 
 export function Panel({ children, style }: React.PropsWithChildren<{ style?: ViewStyle }>) {
   const colors = useColors();
+  const shade = useDepth('raise2');
+  // No border: the shadow does the separating. A 1px line on top of a soft
+  // shadow is what makes a surface read as flat rather than raised.
   const panelStyle = useMemo(
     () => ({
       backgroundColor: colors.cream,
-      borderWidth: 1,
-      borderColor: colors.line,
-      borderRadius: 18,
+      borderRadius: radius.card,
       padding: space.l,
+      boxShadow: shade,
     }),
-    [colors],
+    [colors, shade],
   );
   return <View style={[panelStyle, style]}>{children}</View>;
 }
@@ -188,13 +201,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: -8,
-  },
-  iconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 13,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

@@ -3,7 +3,8 @@ import { StyleSheet, View } from 'react-native';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
 import { space } from '@/design/tokens';
-import { formatMoney, relativeTime } from '@/domain/money';
+import { useMoney } from '@/domain/currency';
+import { relativeTime } from '@/domain/money';
 import type { Approval, Member } from '@/domain/types';
 
 import { PrimaryButton, SecondaryButton, TextButton } from './Buttons';
@@ -24,6 +25,7 @@ export function ApprovalCard({
   onDecline?: () => void;
   onChangeRule?: () => void;
 }) {
+  const { formatMoney } = useMoney();
   const colors = useColors();
   const resolved = approval.status !== 'pending';
   const hue = requester ? (colors.member[requester.hueId] ?? colors.member.pool) : colors.member.pool;

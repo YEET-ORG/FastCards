@@ -1,21 +1,89 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { useAuth } from '@/auth/AuthContext';
-import { Avatar } from '@/components/fin/primitives';
+import { Avatar, PressableSurface } from '@/components/fin/primitives';
 import { Panel, Screen, ScreenHeader } from '@/components/fin/Screen';
 import { AppText } from '@/design/AppText';
 import { useColors, useTheme } from '@/design/theme';
-import { font, space } from '@/design/tokens';
+import { font, radius, space, type ThemeName } from '@/design/tokens';
 import { AnimatedThemeToggle } from '@/shared/ui/micro-interactions/animated-theme-toggle';
+
+const MODE_LABELS: Record<ThemeName, string> = {
+  white: 'White',
+  black: 'Black',
+};
+
+/** Stiffer than the shared `spring` so the dip settles inside the morph. */
+const GLYPH_SPRING = { damping: 18, stiffness: 420, mass: 0.6 };
+
+/**
+ * The sun/moon glyph. `AnimatedThemeToggle` morphs one into the other by
+ * retracting and redrawing the SVG paths; the surrounding spring gives the
+ * tap a physical beat. Pointer events are off so the whole row owns the
+ * gesture — one handler, one interaction.
+ */
+function ThemeGlyph({
+  mode,
+  color,
+  reduceMotion,
+  onToggle,
+}: {
+  mode: ThemeName;
+  color: string;
+  reduceMotion: boolean;
+  onToggle: () => void;
+}) {
+  const scale = useSharedValue(1);
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    if (reduceMotion) return;
+    scale.value = withSequence(
+      withTiming(0.86, { duration: 60, easing: Easing.out(Easing.quad) }),
+      withSpring(1, GLYPH_SPRING),
+    );
+  }, [mode, reduceMotion, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <Animated.View pointerEvents="none" style={[styles.toggleHit, animatedStyle]}>
+      <AnimatedThemeToggle
+        isDark={mode === 'black'}
+        onToggle={onToggle}
+        size={28}
+        // The palette now flips on the tap frame, so the morph is the only
+        // thing still moving — keep it short enough to read as the same beat.
+        duration={reduceMotion ? 0 : 220}
+        color={color}
+        strokeWidth={2}
+      />
+    </Animated.View>
+  );
+}
 
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
-  const { mode, toggleMode } = useTheme();
+  const { mode, toggleMode, reduceMotion } = useTheme();
   const colors = useColors();
   const router = useRouter();
   const hue = colors.member.rohan;
+  const nextLabel = MODE_LABELS[mode === 'black' ? 'white' : 'black'];
 
   return (
     <Screen>
@@ -36,29 +104,26 @@ export default function ProfileScreen() {
         </View>
       </Panel>
 
-      <Panel style={styles.rowPanel}>
+      <PressableSurface
+        onPress={toggleMode}
+        style={[styles.rowPanel, { backgroundColor: colors.cream }]}
+        accessibilityRole="switch"
+        accessibilityLabel="Theme"
+        accessibilityHint={`Switches to ${nextLabel}`}
+        accessibilityState={{ checked: mode === 'black' }}>
         <View style={{ flex: 1, gap: 2 }}>
-          <AppText variant="cardTitle">Appearance</AppText>
+          <AppText variant="cardTitle">Theme</AppText>
           <AppText variant="secondary" tone={colors.textTertiary}>
-            {mode === 'night' ? 'Night' : 'Sunlit'}
+            {MODE_LABELS[mode]}
           </AppText>
         </View>
-        <View
-          accessible
-          accessibilityRole="switch"
-          accessibilityLabel="Night mode"
-          accessibilityState={{ checked: mode === 'night' }}>
-          <AnimatedThemeToggle
-            isDark={mode === 'night'}
-            onToggle={toggleMode}
-            size={28}
-            duration={220}
-            color={colors.textPrimary}
-            strokeWidth={2}
-            style={styles.toggleHit}
-          />
-        </View>
-      </Panel>
+        <ThemeGlyph
+          mode={mode}
+          color={colors.textPrimary}
+          reduceMotion={reduceMotion}
+          onToggle={toggleMode}
+        />
+      </PressableSurface>
 
       {session?.isAdmin ? (
         <Pressable
@@ -93,10 +158,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.l,
   },
+  // Matches Panel's surface treatment — PressableSurface owns the shadow, so
+  // only the fill, radius and padding are repeated here.
   rowPanel: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.m,
+    borderRadius: radius.card,
+    padding: space.l,
   },
   toggleHit: {
     width: 44,

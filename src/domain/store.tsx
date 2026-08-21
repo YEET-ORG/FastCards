@@ -40,6 +40,9 @@ type DomainAction =
 interface DomainContextValue {
   state: DomainState;
   dispatch: (action: DomainAction) => Promise<void>;
+  /** Same as `dispatch` but rethrows, for callers that must not claim
+   * success until the backend confirms it. */
+  dispatchOrThrow: (action: DomainAction) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -90,10 +93,10 @@ export function DomainProvider({ children }: React.PropsWithChildren) {
     await api.executeAction(headersRef.current, action.id, action.factsHash, `app-${action.id}`);
   }, []);
 
-  const dispatch = useCallback(
+  const runAction = useCallback(
     async (action: DomainAction) => {
       const h = headersRef.current;
-      try {
+      {
         switch (action.type) {
           case 'freeze_card':
             await api.freezeCard(h, action.cardId, true);
@@ -133,18 +136,45 @@ export function DomainProvider({ children }: React.PropsWithChildren) {
             break;
           }
         }
+      }
+    },
+    [prepareAndExecute, state],
+  );
+
+  /**
+   * Like `dispatch`, but rethrows after surfacing the error so a caller can
+   * roll its own UI back. Callers that report success to the user must use
+   * this — success must never be shown before the backend confirms it.
+   */
+  const dispatchOrThrow = useCallback(
+    async (action: DomainAction) => {
+      try {
+        await runAction(action);
         await refresh();
       } catch (e) {
         showError(e);
         await refresh();
+        throw e;
       }
     },
-    [prepareAndExecute, refresh, state],
+    [runAction, refresh],
+  );
+
+  /** Fire-and-forget: the error is surfaced as a toast and swallowed. */
+  const dispatch = useCallback(
+    async (action: DomainAction) => {
+      try {
+        await dispatchOrThrow(action);
+      } catch {
+        // Already surfaced by dispatchOrThrow.
+      }
+    },
+    [dispatchOrThrow],
   );
 
   const value = useMemo<DomainContextValue | null>(
-    () => (state ? { state, dispatch, refresh } : null),
-    [state, dispatch, refresh],
+    () => (state ? { state, dispatch, dispatchOrThrow, refresh } : null),
+    [state, dispatch, dispatchOrThrow, refresh],
   );
 
   if (error) {

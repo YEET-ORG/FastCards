@@ -22,7 +22,7 @@ import { AppText } from '@/design/AppText';
 import { useReduceMotion } from '@/design/motion';
 import { useColors } from '@/design/theme';
 import { screenPad, space } from '@/design/tokens';
-import { formatMoney } from '@/domain/money';
+import { useMoney } from '@/domain/currency';
 import { useDomain } from '@/domain/store';
 import type { Card, Member } from '@/domain/types';
 
@@ -63,6 +63,7 @@ function CarouselCard({
 }
 
 export default function CardsHub() {
+  const { formatMoney } = useMoney();
   const { state, dispatch } = useDomain();
   const router = useRouter();
   const toast = useToast();
@@ -189,7 +190,6 @@ export default function CardsHub() {
                   : selected.spentThisMonth
             }
             fontSize={36}
-            variant="display"
           />
           {effectiveCap !== undefined && !closed ? (
             <>

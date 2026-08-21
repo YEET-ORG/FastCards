@@ -1,94 +1,66 @@
-import { StyleSheet, View } from 'react-native';
+import { type StyleProp, type ViewStyle } from 'react-native';
 
-import { AppText } from '@/design/AppText';
-import { useReduceMotion } from '@/design/motion';
-import { useColors } from '@/design/theme';
+import { RollingNumber } from '@/design/RollingNumber';
 import { font } from '@/design/tokens';
-import { RollingCounter } from '@/shared/ui/organisms/rolling-counter';
+import { splitCurrency, useMoney, type CurrencyCode } from '@/domain/currency';
 
+export const MONEY_MASK = '••••••';
+
+/**
+ * A money amount that rolls at digit level when it changes. Thin wrapper over
+ * `RollingNumber`: this file owns the currency, that one owns the motion.
+ *
+ * `amount` is always the integer rupee figure the server stores — conversion
+ * happens inside `splitCurrency`, at the last possible step.
+ */
 export function RollingMoney({
   amount,
-  fontSize = 44,
+  fontSize = 36,
   tone,
+  fractionTone,
+  fontFamily = font.displaySemibold,
   hidden,
-  variant = 'display',
+  digitWidth,
+  style,
+  currency,
 }: {
   amount: number;
   fontSize?: number;
   tone?: string;
+  /** Ink for the cents. Defaults to the theme's secondary text; surfaces with
+   * their own ink (the printed card face) pass their own. */
+  fractionTone?: string;
+  fontFamily?: string;
   hidden?: boolean;
-  variant?: 'display' | 'ui';
+  digitWidth?: number;
+  style?: StyleProp<ViewStyle>;
+  /** Pins the display currency, for surfaces that are rupee-native regardless
+   * of the app-wide toggle (the onboarding budget flow). */
+  currency?: CurrencyCode;
 }) {
-  const colors = useColors();
-  const reduceMotion = useReduceMotion();
-  const resolvedTone = tone ?? colors.textPrimary;
-  const family = variant === 'display' || variant === 'ui' ? font.displaySemibold : font.medium;
-  const height = Math.round(fontSize * 1.18);
-  const digitWidth = Math.round(fontSize * (variant === 'display' ? 0.58 : 0.62));
-  const formatted = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(
-    Math.abs(Math.round(amount)),
-  );
+  const money = useMoney();
+  const code = currency ?? money.code;
 
-  if (hidden) {
-    return (
-      <AppText
-        variant="hero"
-        tone={resolvedTone}
-        style={{ fontSize, lineHeight: height + 6, fontFamily: family }}
-        accessibilityLabel="Balance hidden">
-        ₹ ••••••
-      </AppText>
-    );
-  }
-
-  if (reduceMotion) {
-    return (
-      <AppText
-        variant="hero"
-        tone={resolvedTone}
-        tabular
-        style={{ fontSize, lineHeight: height, fontFamily: family }}
-        accessibilityLabel={`₹${formatted}`}>
-        ₹{formatted}
-      </AppText>
-    );
-  }
+  // The symbol is painted as a separate, non-rolling affix, so it has to come
+  // off the formatted string rather than being concatenated by hand.
+  const { symbol, digits } = splitCurrency(code, amount);
 
   return (
-    <View style={styles.row} accessibilityLabel={`₹${formatted}`} accessible accessibilityRole="text">
-      <AppText
-        variant="hero"
-        tone={resolvedTone}
-        style={{ fontSize: Math.round(fontSize * 0.82), lineHeight: height, marginRight: 2, fontFamily: family }}>
-        ₹
-      </AppText>
-      {formatted.split('').map((ch, i) =>
-        /\d/.test(ch) ? (
-          <RollingCounter
-            key={`d-${i}`}
-            value={Number(ch)}
-            fontSize={fontSize}
-            height={height}
-            width={digitWidth}
-            color={resolvedTone}
-            digitStyle={{ fontFamily: family, fontWeight: undefined }}
-          />
-        ) : (
-          <AppText
-            key={`s-${i}`}
-            tone={resolvedTone}
-            style={{ fontSize: Math.round(fontSize * 0.9), lineHeight: height, fontFamily: family }}>
-            {ch}
-          </AppText>
-        ),
-      )}
-    </View>
+    <RollingNumber
+      value={amount}
+      format={() => digits}
+      prefix={symbol}
+      // Only USD carries a fraction; INR is whole rupees.
+      fractionDigits={code === 'USD' ? 2 : 0}
+      fontSize={fontSize}
+      fontFamily={fontFamily}
+      tone={tone}
+      fractionTone={fractionTone}
+      hidden={hidden}
+      maskText={MONEY_MASK}
+      digitWidth={digitWidth}
+      accessibilityLabel={hidden ? 'Balance hidden' : `${symbol}${digits}`}
+      style={style}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-  },
-});

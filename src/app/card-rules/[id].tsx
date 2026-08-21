@@ -10,7 +10,7 @@ import { useToast } from '@/components/fin/Toast';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
 import { font, radius, space, type ColorTokens } from '@/design/tokens';
-import { formatMoney } from '@/domain/money';
+import { formatMoneyINR } from '@/domain/money';
 import { useDomain } from '@/domain/store';
 
 // Card Rules (spec §10, UI §15): AI rule composer on top (routes into the
@@ -100,7 +100,7 @@ export default function CardRules() {
             <View style={{ flex: 1, gap: 2 }}>
               <AppText variant="body">Monthly limit</AppText>
               <AppText variant="secondary" tone={colors.textTertiary}>
-                {card.monthlyCap !== undefined ? `${formatMoney(card.monthlyCap)} per month` : 'No limit set'}
+                {card.monthlyCap !== undefined ? `${formatMoneyINR(card.monthlyCap)} per month` : 'No limit set'}
               </AppText>
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
@@ -114,7 +114,7 @@ export default function CardRules() {
               <AppText variant="body">Approval threshold</AppText>
               <AppText variant="secondary" tone={colors.textTertiary}>
                 {card.approvalAbove !== undefined
-                  ? `Ask me before purchases over ${formatMoney(card.approvalAbove)}`
+                  ? `Ask me before purchases over ${formatMoneyINR(card.approvalAbove)}`
                   : 'No approval required'}
               </AppText>
             </View>
@@ -129,7 +129,7 @@ export default function CardRules() {
           <SectionHeader title="Temporary" />
           <RuleChip
             state="temporary"
-            label={`+${formatMoney(member.tempAllowance.amount)} until ${member.tempAllowance.expiresAtLabel} · ends automatically`}
+            label={`+${formatMoneyINR(member.tempAllowance.amount)} until ${member.tempAllowance.expiresAtLabel} · ends automatically`}
           />
         </View>
       ) : null}
@@ -146,7 +146,7 @@ export default function CardRules() {
                   <View style={{ flex: 1, gap: 2 }}>
                     <AppText variant="body">{c.label}</AppText>
                     <AppText variant="secondary" tone={colors.textTertiary}>
-                      {c.enabled ? `Up to ${formatMoney(c.cap)} per month` : 'Off — purchases decline'}
+                      {c.enabled ? `Up to ${formatMoneyINR(c.cap)} per month` : 'Off — purchases decline'}
                     </AppText>
                   </View>
                   <Switch
@@ -204,18 +204,18 @@ export default function CardRules() {
             value:
               editing === 'limit'
                 ? card.monthlyCap !== undefined
-                  ? `${formatMoney(card.monthlyCap)} / month`
+                  ? `${formatMoneyINR(card.monthlyCap)} / month`
                   : 'No limit'
                 : card.approvalAbove !== undefined
-                  ? `Ask over ${formatMoney(card.approvalAbove)}`
+                  ? `Ask over ${formatMoneyINR(card.approvalAbove)}`
                   : 'No approval required',
           },
           {
             label: 'New',
             value:
               editing === 'limit'
-                ? `${formatMoney(parsedAmount)} / month`
-                : `Ask over ${formatMoney(parsedAmount)}`,
+                ? `${formatMoneyINR(parsedAmount)} / month`
+                : `Ask over ${formatMoneyINR(parsedAmount)}`,
             emphasis: true,
           },
           { label: 'Effective', value: 'Immediately' },
@@ -223,8 +223,8 @@ export default function CardRules() {
         note="This is a permanent rule change."
         cta={
           editing === 'limit'
-            ? `Set limit to ${formatMoney(parsedAmount)}`
-            : `Ask me over ${formatMoney(parsedAmount)}`
+            ? `Set limit to ${formatMoneyINR(parsedAmount)}`
+            : `Ask me over ${formatMoneyINR(parsedAmount)}`
         }
         onConfirm={() => {
           if (editing === 'limit' && member) {

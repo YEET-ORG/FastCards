@@ -1,8 +1,19 @@
-// Sunlit Household (default) + Night Household. Color lives on objects
-// (members, cards, chips, active nav, primary buttons, progress). Paper,
-// body copy, money amounts, and execute facts stay quiet.
+// Two modes: White (default) and Black. Color lives on objects (members,
+// cards, chips, active nav, primary buttons, progress). Paper, body copy,
+// money amounts, and execute facts stay quiet.
+//
+// White is the skeuomorphic mode: pure white surfaces on a cool near-white
+// ground, where hierarchy is carried by `depth` (multi-layer shadow +
+// top-edge highlight) rather than by fill or borders.
+//
+// Black inverts the *mechanism* without inverting the components. A drop
+// shadow carries no information on #000, so hierarchy is carried by real
+// fill deltas instead: bg (#000) < inset < cream < raised. A "well" only
+// ever appears inside a panel, so `inset` sitting below `cream`/`raised`
+// still reads recessed there. `depth.black` keeps black drops for the halo
+// under floating elements but leans on a much stronger top-edge highlight.
 
-export type ThemeName = 'sunlit' | 'night';
+export type ThemeName = 'white' | 'black';
 
 export type MemberHueId =
   | 'rohan'
@@ -36,6 +47,9 @@ export interface ColorTokens {
   textSecondary: string;
   textTertiary: string;
   textDisabled: string;
+
+  /** Default tone for non-semantic glyphs (quick actions, nav, row icons). */
+  iconPrimary: string;
 
   accent: string;
   accentBright: string;
@@ -103,132 +117,148 @@ function withAliases(
   };
 }
 
-const sunlitMember: Record<MemberHueId, MemberHue> = {
-  rohan: { fill: '#E08A2A', ink: '#9A5A10', dim: '#F8E6CC' },
-  maya: { fill: '#D4536A', ink: '#A03048', dim: '#F8D6DC' },
-  arjun: { fill: '#2A8F7B', ink: '#176A5A', dim: '#D4EDE6' },
-  dad: { fill: '#C4A574', ink: '#7A6540', dim: '#F0E6D4' },
-  subscriptions: { fill: '#4A4E8A', ink: '#32366A', dim: '#DCDEEE' },
-  protected: { fill: '#D4A04A', ink: '#8A6418', dim: '#F8E8CC' },
-  groceries: { fill: '#5A8F5E', ink: '#3A6A3E', dim: '#DCEADC' },
-  teen: { fill: '#E0896C', ink: '#A05038', dim: '#F8DED4' },
-  merchant: { fill: '#7A4A6A', ink: '#5A2E4C', dim: '#E8D6E0' },
-  pool: { fill: '#C4785A', ink: '#8A4A32', dim: '#F4DCD0' },
-  custom: { fill: '#C45A6E', ink: '#8A3044', dim: '#F4D6DC' },
-  temporary: { fill: '#C8B44A', ink: '#7A6A18', dim: '#F4EEC8' },
+// Retuned cooler and a little less saturated so the warm hues sit calmly on
+// a white ground next to a blue accent instead of fighting it.
+const whiteMember: Record<MemberHueId, MemberHue> = {
+  rohan: { fill: '#D97A2B', ink: '#9C5312', dim: '#FBEBD9' },
+  maya: { fill: '#CE4C63', ink: '#A22C43', dim: '#FBE0E5' },
+  arjun: { fill: '#218B77', ink: '#146555', dim: '#D8EFE9' },
+  dad: { fill: '#B39468', ink: '#75603C', dim: '#F1E9DC' },
+  subscriptions: { fill: '#4A4E8A', ink: '#32366A', dim: '#E1E2F0' },
+  protected: { fill: '#C99530', ink: '#8A6418', dim: '#FAEDD3' },
+  groceries: { fill: '#4F8A55', ink: '#356038', dim: '#DFEDE0' },
+  teen: { fill: '#D97F60', ink: '#A04E36', dim: '#FBE3D9' },
+  merchant: { fill: '#75486A', ink: '#552E4C', dim: '#EBDCE7' },
+  pool: { fill: '#BC7156', ink: '#8A4A32', dim: '#F7E2D9' },
+  custom: { fill: '#BE5468', ink: '#8A3044', dim: '#F8DFE4' },
+  temporary: { fill: '#B9A63F', ink: '#786A18', dim: '#F4F0D4' },
 };
 
-const nightMember: Record<MemberHueId, MemberHue> = {
-  rohan: { fill: '#F0A04A', ink: '#F0A04A', dim: '#3A2A14' },
-  maya: { fill: '#F07A90', ink: '#F07A90', dim: '#3A1C24' },
-  arjun: { fill: '#3DB89A', ink: '#3DB89A', dim: '#14302A' },
-  dad: { fill: '#DCC09A', ink: '#DCC09A', dim: '#32281C' },
-  subscriptions: { fill: '#6A70B8', ink: '#8A90D0', dim: '#1C1E38' },
-  protected: { fill: '#E8B85A', ink: '#E8B85A', dim: '#3A2E14' },
-  groceries: { fill: '#78B07A', ink: '#78B07A', dim: '#1C2E1C' },
-  teen: { fill: '#F0A488', ink: '#F0A488', dim: '#3A241C' },
-  merchant: { fill: '#A06090', ink: '#C080B0', dim: '#2A1824' },
-  pool: { fill: '#E09070', ink: '#E09070', dim: '#3A241C' },
-  custom: { fill: '#E07890', ink: '#E07890', dim: '#3A1C24' },
-  temporary: { fill: '#E0CC66', ink: '#E0CC66', dim: '#322E14' },
+// Same twelve identities on black. `fill` carries the hue at full strength,
+// `ink` is a lighter step for text/glyphs on a dark chip, and `dim` is a
+// deeply desaturated tint of the hue — dark enough to sit on #000 without
+// reading as a warm or brown wash.
+const blackMember: Record<MemberHueId, MemberHue> = {
+  rohan: { fill: '#F0A04A', ink: '#F5B87A', dim: '#241A0C' },
+  maya: { fill: '#F07A90', ink: '#F59DAD', dim: '#28111A' },
+  arjun: { fill: '#3DB89A', ink: '#6FD1B8', dim: '#0C221D' },
+  dad: { fill: '#DCC09A', ink: '#E8D3B8', dim: '#221C14' },
+  subscriptions: { fill: '#6A70B8', ink: '#949AD8', dim: '#14152A' },
+  protected: { fill: '#E8B85A', ink: '#F0CC88', dim: '#241D0E' },
+  groceries: { fill: '#78B07A', ink: '#9CC99E', dim: '#121F13' },
+  teen: { fill: '#F0A488', ink: '#F5BFAB', dim: '#241610' },
+  merchant: { fill: '#A06090', ink: '#C88BB8', dim: '#1F1220' },
+  pool: { fill: '#E09070', ink: '#EBB098', dim: '#241510' },
+  custom: { fill: '#E07890', ink: '#EB9CAF', dim: '#241318' },
+  temporary: { fill: '#E0CC66', ink: '#EBDB94', dim: '#221F0E' },
 };
 
-export const sunlit: ColorTokens = withAliases({
-  bg: '#FFF8F1',
-  cream: '#FFF1E4',
+export const white: ColorTokens = withAliases({
+  bg: '#F7F8FA',
+  // cream and raised are both pure white here: under White the difference
+  // between a panel and the thing on top of it is expressed by `depth`,
+  // never by fill.
+  cream: '#FFFFFF',
   raised: '#FFFFFF',
-  inset: '#F4E6D8',
-  line: '#E8D5C4',
-  lineStrong: '#D4B8A2',
+  inset: '#EDEFF3',
+  line: '#E4E7EC',
+  lineStrong: '#D2D7DF',
 
-  textPrimary: '#1C1612',
-  textSecondary: '#6B5E55',
-  textTertiary: '#8F8278',
-  textDisabled: '#C4B6AA',
+  textPrimary: '#1A1A1A',
+  textSecondary: '#6B6B6B',
+  textTertiary: '#9A9DA3',
+  textDisabled: '#C4C7CC',
 
-  accent: '#E06A3A',
-  accentBright: '#EC7A4C',
-  accentDim: '#F8E0D4',
-  accentInk: '#C24E28',
-  onAccent: '#FFF8F1',
+  iconPrimary: '#2C2C2C',
 
-  mint: '#1B9A6C',
-  mintBright: '#22B37D',
-  mintDim: '#D7F0E4',
-  mintBorder: '#8FCFB0',
-  mintInk: '#0F7A54',
-  onMint: '#FFF8F1',
+  accent: '#3B6FD4',
+  accentBright: '#4E82E8',
+  accentDim: '#E4ECFB',
+  accentInk: '#2A55B0',
+  onAccent: '#FFFFFF',
 
-  warning: '#D8902A',
-  warningDim: '#F8E9CC',
-  warningInk: '#9A6410',
-  error: '#D6454A',
-  errorDim: '#F8D6D7',
-  errorInk: '#B42328',
-  info: '#3D6FDB',
-  infoDim: '#D9E4FA',
-  infoInk: '#2A54B8',
+  mint: '#0F9D63',
+  mintBright: '#17B374',
+  mintDim: '#DCF3E8',
+  mintBorder: '#8ACFB3',
+  mintInk: '#0A7A4C',
+  onMint: '#FFFFFF',
 
-  overlay: 'rgba(28,22,18,0.46)',
-  scrim: 'rgba(28,22,18,0.70)',
-  onCard: '#F4EDE4',
+  warning: '#C9860F',
+  warningDim: '#FBEED2',
+  warningInk: '#8F5E06',
+  error: '#D33F45',
+  errorDim: '#FBDCDE',
+  errorInk: '#AE2229',
+  info: '#3B6FD4',
+  infoDim: '#E4ECFB',
+  infoInk: '#2A55B0',
+
+  overlay: 'rgba(16,24,40,0.44)',
+  scrim: 'rgba(16,24,40,0.68)',
+  onCard: '#FFFFFF',
   chipGold: '#E8C98A',
   chipGoldStroke: '#C9A96A',
-  goldDim: '#F8E6CC',
+  goldDim: '#F5EBD6',
 
-  member: sunlitMember,
+  member: whiteMember,
 });
 
-export const night: ColorTokens = withAliases({
-  bg: '#1C1612',
-  cream: '#221C17',
-  raised: '#261E18',
-  inset: '#1A1511',
-  line: '#3A3028',
-  lineStrong: '#4A3E34',
+export const black: ColorTokens = withAliases({
+  // The ground is true black. Surfaces ascend from it by fill, because a
+  // drop shadow on #000 separates nothing: inset (recessed inside a panel)
+  // < cream (the panel) < raised (the thing on the panel).
+  bg: '#000000',
+  cream: '#121212',
+  raised: '#1A1A1A',
+  inset: '#0A0A0A',
+  line: '#262626',
+  lineStrong: '#3A3A3A',
 
-  textPrimary: '#F4EDE4',
-  textSecondary: '#C4B6AA',
-  textTertiary: '#8F8278',
-  textDisabled: '#5C524A',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#A6A6A6',
+  textTertiary: '#757575',
+  textDisabled: '#4A4A4A',
 
-  accent: '#F07A4A',
-  accentBright: '#F58B60',
-  accentDim: '#3A241C',
-  accentInk: '#F07A4A',
-  onAccent: '#1C1612',
+  iconPrimary: '#FFFFFF',
 
-  mint: '#3DD68C',
-  mintBright: '#5EE4A4',
-  mintDim: '#1A3A2C',
-  mintBorder: '#2A6A4C',
-  mintInk: '#3DD68C',
-  onMint: '#1C1612',
+  accent: '#5B8DEF',
+  accentBright: '#7BA5F5',
+  accentDim: '#101A2E',
+  accentInk: '#9CBCF8',
+  onAccent: '#000000',
 
-  warning: '#E8B44A',
-  warningDim: '#3A2E14',
-  warningInk: '#E8B44A',
-  error: '#FF7A7E',
-  errorDim: '#3A1C1E',
-  errorInk: '#FF7A7E',
-  info: '#8AB0FF',
-  infoDim: '#1C2840',
-  infoInk: '#8AB0FF',
+  mint: '#34D399',
+  mintBright: '#5BE3B0',
+  mintDim: '#0C2419',
+  mintBorder: '#1F6B4C',
+  mintInk: '#4FDFA6',
+  onMint: '#000000',
 
-  overlay: 'rgba(8,6,4,0.72)',
-  scrim: 'rgba(12,8,6,0.78)',
-  onCard: '#F4EDE4',
+  warning: '#F5B544',
+  warningDim: '#2A1F0A',
+  warningInk: '#F7C468',
+  error: '#FF6B70',
+  errorDim: '#2A1113',
+  errorInk: '#FF8A8E',
+  info: '#5B8DEF',
+  infoDim: '#101A2E',
+  infoInk: '#9CBCF8',
+
+  overlay: 'rgba(0,0,0,0.62)',
+  scrim: 'rgba(0,0,0,0.82)',
+  onCard: '#FFFFFF',
   chipGold: '#E8C98A',
   chipGoldStroke: '#C9A96A',
-  goldDim: '#3A2A14',
+  goldDim: '#241D10',
 
-  member: nightMember,
+  member: blackMember,
 });
 
-export const palettes: Record<ThemeName, ColorTokens> = { sunlit, night };
+export const palettes: Record<ThemeName, ColorTokens> = { white, black };
 
-/** Static default = Sunlit, including aliases. Night requires useColors(). */
-export const color = sunlit;
+/** Static default = White, including aliases. Black needs useColors(). */
+export const color = white;
 
 export const space = {
   xs: 4,
@@ -272,18 +302,46 @@ export const duration = {
   sheet: 280,
 } as const;
 
-export const shadow = {
-  sunlit: {
-    dock: { color: 'rgba(28,22,18,0.10)', offset: { width: 0, height: 8 }, opacity: 1, radius: 20, elevation: 8 },
-    tile: { color: 'rgba(28,22,18,0.06)', offset: { width: 0, height: 4 }, opacity: 1, radius: 12, elevation: 3 },
-    sheet: { color: 'rgba(28,22,18,0.18)', offset: { width: 0, height: -8 }, opacity: 1, radius: 24, elevation: 16 },
+/**
+ * Physical depth, expressed as CSS-style `boxShadow` strings.
+ *
+ * RN 0.86 on the New Architecture supports comma-separated multi-layer
+ * shadows and `inset`, which the legacy `shadow*`/`elevation` props cannot
+ * do — one outer layer only, no inner shadow. Skeuomorphism needs both: a
+ * soft diffuse drop plus a top-edge highlight that reads as light catching
+ * the raised edge.
+ *
+ * `raise1/2/3` ascend in elevation (rows → cards → hero/nav/FAB), `well` is
+ * a recessed track (segmented control, inputs), `press` is the pushed-in
+ * state. Apply with the `useDepth()` hook so the mode is picked up.
+ */
+export type DepthLevel = 'raise1' | 'raise2' | 'raise3' | 'well' | 'press';
+
+export const depth: Record<ThemeName, Record<DepthLevel, string>> = {
+  white: {
+    raise1:
+      '0px 1px 2px rgba(16,24,40,0.04), 0px 4px 10px rgba(16,24,40,0.05), inset 0px 1px 0px rgba(255,255,255,0.9)',
+    raise2:
+      '0px 2px 4px rgba(16,24,40,0.05), 0px 10px 24px rgba(16,24,40,0.07), inset 0px 1px 0px rgba(255,255,255,1)',
+    raise3:
+      '0px 4px 8px rgba(16,24,40,0.06), 0px 18px 40px rgba(16,24,40,0.10), inset 0px 1px 0px rgba(255,255,255,1)',
+    well: 'inset 0px 2px 4px rgba(16,24,40,0.08), inset 0px -1px 0px rgba(255,255,255,0.8)',
+    press: 'inset 0px 2px 6px rgba(16,24,40,0.12)',
   },
-  night: {
-    dock: { color: 'rgba(0,0,0,0.40)', offset: { width: 0, height: 8 }, opacity: 1, radius: 20, elevation: 8 },
-    tile: { color: 'rgba(0,0,0,0.28)', offset: { width: 0, height: 4 }, opacity: 1, radius: 12, elevation: 3 },
-    sheet: { color: 'rgba(0,0,0,0.50)', offset: { width: 0, height: -8 }, opacity: 1, radius: 24, elevation: 16 },
+  // On black a drop shadow is almost pure information loss, so the drops
+  // only supply a halo under floating elements and the real edge is the
+  // top-lit inset highlight, pushed far harder than a light theme needs.
+  black: {
+    raise1:
+      '0px 1px 2px rgba(0,0,0,0.60), 0px 4px 10px rgba(0,0,0,0.50), inset 0px 1px 0px rgba(255,255,255,0.06)',
+    raise2:
+      '0px 2px 4px rgba(0,0,0,0.60), 0px 10px 24px rgba(0,0,0,0.55), inset 0px 1px 0px rgba(255,255,255,0.08)',
+    raise3:
+      '0px 4px 8px rgba(0,0,0,0.65), 0px 18px 40px rgba(0,0,0,0.70), inset 0px 1px 0px rgba(255,255,255,0.10)',
+    well: 'inset 0px 2px 6px rgba(0,0,0,0.80), inset 0px -1px 0px rgba(255,255,255,0.05)',
+    press: 'inset 0px 2px 8px rgba(0,0,0,0.85)',
   },
-} as const;
+};
 
 export const icon = { default: 21, meta: 17, tab: 22 } as const;
 

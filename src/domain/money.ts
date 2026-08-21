@@ -1,6 +1,11 @@
 // Locale-aware money formatting (spec §62: never concatenate currency
-// symbols manually). Demo currency is INR throughout (spec §61: one
-// currency per flow).
+// symbols manually). Amounts are stored as integer INR rupees throughout.
+//
+// These two are the *unconditional rupee* formatters. Screens should almost
+// always use `useMoney()` from `@/domain/currency` instead, which honours the
+// user's display-currency choice — the `INR` suffix here is deliberate, so
+// that reaching for the always-rupees version is a visible decision rather
+// than an accident.
 
 const inrWhole = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -8,12 +13,12 @@ const inrWhole = new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 0,
 });
 
-export function formatMoney(amount: number): string {
+export function formatMoneyINR(amount: number): string {
   return inrWhole.format(amount);
 }
 
 /** Signed amount for transaction contexts: debit "−₹640", credit "+₹41". */
-export function formatSigned(amount: number, direction: 'debit' | 'credit'): string {
+export function formatSignedINR(amount: number, direction: 'debit' | 'credit'): string {
   const base = inrWhole.format(Math.abs(amount));
   return direction === 'credit' ? `+${base}` : `−${base}`;
 }

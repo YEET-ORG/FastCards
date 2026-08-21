@@ -13,7 +13,7 @@ import { TransactionRow } from '@/components/fin/TransactionRow';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
 import { space } from '@/design/tokens';
-import { formatMoney } from '@/domain/money';
+import { useMoney } from '@/domain/currency';
 import { cardForMember, memberRemaining, pendingApprovals, useDomain } from '@/domain/store';
 
 // Family Member Detail (spec §26, UI §19): remaining amount leads,
@@ -23,6 +23,7 @@ import { cardForMember, memberRemaining, pendingApprovals, useDomain } from '@/d
 const LIMIT_STEP = 1000;
 
 export default function MemberDetail() {
+  const { formatMoney } = useMoney();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, dispatch } = useDomain();
   const router = useRouter();

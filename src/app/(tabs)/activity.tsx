@@ -10,7 +10,8 @@ import { TransactionRow } from '@/components/fin/TransactionRow';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
 import { font, space } from '@/design/tokens';
-import { dayLabel, formatMoney, relativeTime } from '@/domain/money';
+import { useMoney } from '@/domain/currency';
+import { dayLabel, relativeTime } from '@/domain/money';
 import { useDomain } from '@/domain/store';
 import type { AuditEvent, Transaction } from '@/domain/types';
 
@@ -31,6 +32,7 @@ const eventIcons: Record<AuditEvent['kind'], keyof typeof Ionicons.glyphMap> = {
 };
 
 export default function ActivityFeed() {
+  const { formatMoney } = useMoney();
   const { state } = useDomain();
   const router = useRouter();
   const colors = useColors();

@@ -8,7 +8,8 @@ import { Panel, Screen, ScreenHeader } from '@/components/fin/Screen';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
 import { space, type ColorTokens } from '@/design/tokens';
-import { exactTime, formatSigned } from '@/domain/money';
+import { useMoney } from '@/domain/currency';
+import { exactTime } from '@/domain/money';
 import { useDomain } from '@/domain/store';
 
 // Transaction Detail (spec §31, UI §24): only fields that exist, the rule
@@ -16,6 +17,7 @@ import { useDomain } from '@/domain/store';
 // carries context.
 
 export default function TransactionDetail() {
+  const { formatSigned } = useMoney();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state } = useDomain();
   const router = useRouter();

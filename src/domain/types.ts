@@ -51,6 +51,12 @@ export interface Card {
   variant: CardVariant;
   status: CardStatus;
   last4: string;
+  /**
+   * Card network, when the issuer reports one. Optional on purpose: the
+   * provider currently returns only `last4`, so the UI must not imply a
+   * network it has not been told about.
+   */
+  network?: 'visa' | 'mastercard';
   memberId?: string;
   purpose?: string;
   monthlyCap?: number;

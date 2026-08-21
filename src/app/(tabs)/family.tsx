@@ -11,10 +11,11 @@ import { AvatarGroup } from '@/shared/ui/base/avatar-group';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
 import { space } from '@/design/tokens';
-import { formatMoney } from '@/domain/money';
+import { useMoney } from '@/domain/currency';
 import { cardForMember, pendingApprovals, useDomain } from '@/domain/store';
 
 export default function FamilyDashboard() {
+  const { formatMoney } = useMoney();
   const { state } = useDomain();
   const router = useRouter();
   const colors = useColors();

@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/design/AppText';
-import { useColors } from '@/design/theme';
-import { space } from '@/design/tokens';
+import { useColors, useDepth } from '@/design/theme';
+import { radius, space } from '@/design/tokens';
 
 import { TextButton } from './Buttons';
 
@@ -19,18 +19,19 @@ export function InsightCard({
   onDismiss?: () => void;
 }) {
   const colors = useColors();
+  const shade = useDepth('raise2');
   return (
-    <View style={[styles.card, { backgroundColor: colors.cream, borderColor: colors.line }]}>
+    <View style={[styles.card, { backgroundColor: colors.cream, boxShadow: shade }]}>
       <View style={styles.eyebrowRow}>
         <View style={styles.eyebrow}>
-          <Ionicons name="sparkles-outline" size={13} color={colors.mintInk} />
-          <AppText variant="label" tone={colors.mintInk}>
+          <Ionicons name="sparkles-outline" size={12} color={colors.accentInk} />
+          <AppText variant="label" tone={colors.accentInk}>
             AI Insight
           </AppText>
         </View>
         {onDismiss ? (
           <Pressable onPress={onDismiss} hitSlop={10} accessibilityRole="button" accessibilityLabel="Dismiss insight">
-            <Ionicons name="close" size={16} color={colors.textTertiary} />
+            <Ionicons name="close" size={15} color={colors.textTertiary} />
           </Pressable>
         ) : null}
       </View>
@@ -65,10 +66,10 @@ export function InsightCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: space.l,
-    gap: space.m,
+    borderRadius: radius.card,
+    paddingHorizontal: space.l,
+    paddingVertical: space.m,
+    gap: space.s,
   },
   eyebrowRow: {
     flexDirection: 'row',
@@ -78,7 +79,7 @@ const styles = StyleSheet.create({
   eyebrow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: space.xs,
   },
   rows: {
     gap: 6,
@@ -92,6 +93,10 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    gap: space.xxl,
+    gap: space.xl,
+    // Reclaims TextButton's own 8pt of vertical padding without touching the
+    // shared button (its hitSlop keeps the tap target intact).
+    marginTop: -4,
+    marginBottom: -4,
   },
 });

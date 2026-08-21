@@ -16,7 +16,7 @@ import { TransactionRow } from '@/components/fin/TransactionRow';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
 import { font, radius, space, type ColorTokens } from '@/design/tokens';
-import { formatMoney } from '@/domain/money';
+import { useMoney } from '@/domain/currency';
 import { useDomain } from '@/domain/store';
 import { FlipCard } from '@/shared/ui/base/flip-card';
 import { useReduceMotion } from '@/design/motion';
@@ -27,6 +27,7 @@ import { useReduceMotion } from '@/design/motion';
 // sit separated at the bottom with consequence copy.
 
 export default function CardDetail() {
+  const { formatMoney } = useMoney();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { state, dispatch } = useDomain();
   const { headers } = useAuth();

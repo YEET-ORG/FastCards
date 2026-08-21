@@ -167,6 +167,7 @@ const AnimatedInput: React.FC<IAnimatedInput> &
     blurAnimationDuration = 400,
     blurIntensityRange = [0, 0, 0],
     blurProgressRange = [0, 0.2, 1],
+    inputRef,
     ...props
   }: IAnimatedInput): React.ReactNode &
     React.JSX.Element &
@@ -174,6 +175,12 @@ const AnimatedInput: React.FC<IAnimatedInput> &
     const [isFocused, setIsFocused] = useState<boolean>(false);
     const [inputValue, setInputValue] = useState<string>(value || "");
     const [currentIndex, setCurrentIndex] = useState<number>(0);
+
+    // Without this the input is uncontrolled after mount, so a caller clearing
+    // `value` (e.g. after submitting) leaves the old text on screen.
+    useEffect(() => {
+      setInputValue((prev) => (value !== undefined && value !== prev ? value : prev));
+    }, [value]);
 
     const blurProgress = useSharedValue<number>(0);
 
@@ -246,6 +253,7 @@ const AnimatedInput: React.FC<IAnimatedInput> &
           />
           ) : null}
           <TextInput
+            ref={inputRef}
             style={[styles.input, inputStyle]}
             value={inputValue}
             onChangeText={handleChangeText}

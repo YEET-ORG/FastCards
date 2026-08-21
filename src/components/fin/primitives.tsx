@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { AppText } from '@/design/AppText';
-import { useColors } from '@/design/theme';
-import { radius, space } from '@/design/tokens';
+import { useReduceMotion } from '@/design/motion';
+import { useColors, useTheme } from '@/design/theme';
+import { depth, radius, space, type DepthLevel } from '@/design/tokens';
 import { Avatar as ReacticxAvatar } from '@/shared/ui/base/avatar';
 import Badge from '@/shared/ui/base/badge';
 import { AnimatedProgressBar } from '@/shared/ui/organisms/progress';
@@ -56,18 +58,27 @@ export type BadgeStatus =
 
 export function StatusBadge({ status, label }: { status: BadgeStatus; label?: string }) {
   const colors = useColors();
+  // The vendored Badge ships hardcoded pastel fills, which glare on black
+  // (and mis-colour Frozen/Expired/Closed green on white). `style` lands
+  // after the variant style, so the fill is themed here alongside the ink.
   const cfg: Record<
     BadgeStatus,
-    { label: string; variant: 'default' | 'success' | 'warning' | 'error' | 'pending'; fg: string; icon: keyof typeof Ionicons.glyphMap }
+    {
+      label: string;
+      variant: 'default' | 'success' | 'warning' | 'error' | 'pending';
+      fg: string;
+      bg: string;
+      icon: keyof typeof Ionicons.glyphMap;
+    }
   > = {
-    active: { label: 'Active', variant: 'success', fg: colors.mintInk, icon: 'checkmark-circle-outline' },
-    frozen: { label: 'Frozen', variant: 'default', fg: colors.infoInk, icon: 'snow-outline' },
-    pending: { label: 'Pending', variant: 'pending', fg: colors.warningInk, icon: 'time-outline' },
-    approval: { label: 'Needs approval', variant: 'warning', fg: colors.warningInk, icon: 'hand-left-outline' },
-    declined: { label: 'Declined', variant: 'error', fg: colors.errorInk, icon: 'close-circle-outline' },
-    expired: { label: 'Expired', variant: 'default', fg: colors.textTertiary, icon: 'timer-outline' },
-    closed: { label: 'Closed', variant: 'default', fg: colors.textTertiary, icon: 'lock-closed-outline' },
-    temporary: { label: 'Temporary', variant: 'success', fg: colors.mintInk, icon: 'hourglass-outline' },
+    active: { label: 'Active', variant: 'success', fg: colors.mintInk, bg: colors.mintDim, icon: 'checkmark-circle-outline' },
+    frozen: { label: 'Frozen', variant: 'default', fg: colors.infoInk, bg: colors.infoDim, icon: 'snow-outline' },
+    pending: { label: 'Pending', variant: 'pending', fg: colors.warningInk, bg: colors.warningDim, icon: 'time-outline' },
+    approval: { label: 'Needs approval', variant: 'warning', fg: colors.warningInk, bg: colors.warningDim, icon: 'hand-left-outline' },
+    declined: { label: 'Declined', variant: 'error', fg: colors.errorInk, bg: colors.errorDim, icon: 'close-circle-outline' },
+    expired: { label: 'Expired', variant: 'default', fg: colors.textTertiary, bg: colors.inset, icon: 'timer-outline' },
+    closed: { label: 'Closed', variant: 'default', fg: colors.textTertiary, bg: colors.inset, icon: 'lock-closed-outline' },
+    temporary: { label: 'Temporary', variant: 'success', fg: colors.mintInk, bg: colors.mintDim, icon: 'hourglass-outline' },
   };
   const item = cfg[status];
   return (
@@ -77,6 +88,7 @@ export function StatusBadge({ status, label }: { status: BadgeStatus; label?: st
       size="sm"
       radius="full"
       icon={<Ionicons name={item.icon} size={12} color={item.fg} />}
+      style={{ backgroundColor: item.bg }}
       textStyle={{ color: item.fg, fontSize: 11 }}
     />
   );
@@ -179,6 +191,64 @@ export function RuleChip({
   );
 }
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/**
+ * A raised surface that physically pushes in when touched: the drop shadow
+ * collapses to an inset one and the surface scales down a little. This is
+ * the single definition of press feedback for the skeuomorphic surfaces —
+ * use it instead of hand-rolling opacity or background swaps.
+ */
+export function PressableSurface({
+  level = 'raise2',
+  onPress,
+  disabled,
+  style,
+  children,
+  ...a11y
+}: {
+  level?: Exclude<DepthLevel, 'press' | 'well'>;
+  onPress?: () => void;
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+  accessibilityRole?: 'button' | 'tab' | 'link' | 'switch';
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  accessibilityState?: { selected?: boolean; disabled?: boolean; checked?: boolean };
+}) {
+  const { mode } = useTheme();
+  const reduceMotion = useReduceMotion();
+  const pressed = useSharedValue(0);
+
+  const restShadow = depth[mode][level];
+  const pressShadow = depth[mode].press;
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: reduceMotion ? 1 : 1 - pressed.value * 0.03 }],
+  }));
+
+  const [isDown, setIsDown] = useState(false);
+
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      disabled={disabled}
+      onPressIn={() => {
+        setIsDown(true);
+        pressed.value = withTiming(1, { duration: 100 });
+      }}
+      onPressOut={() => {
+        setIsDown(false);
+        pressed.value = withTiming(0, { duration: 200 });
+      }}
+      style={[style, { boxShadow: isDown ? pressShadow : restShadow }, animatedStyle]}
+      {...a11y}>
+      {children}
+    </AnimatedPressable>
+  );
+}
+
 export function QuickAction({
   icon,
   label,
@@ -190,22 +260,19 @@ export function QuickAction({
 }) {
   const colors = useColors();
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={({ pressed }) => [styles.quickAction, pressed && { opacity: 0.7 }]}>
-      <View
-        style={[
-          styles.quickActionIcon,
-          { backgroundColor: colors.cream, borderColor: colors.line },
-        ]}>
-        <Ionicons name={icon} size={22} color={colors.textPrimary} />
-      </View>
+    <View style={styles.quickAction}>
+      <PressableSurface
+        level="raise2"
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        style={[styles.quickActionIcon, { backgroundColor: colors.raised }]}>
+        <Ionicons name={icon} size={22} color={colors.iconPrimary} />
+      </PressableSurface>
       <AppText variant="caption" tone={colors.textSecondary}>
         {label}
       </AppText>
-    </Pressable>
+    </View>
   );
 }
 
@@ -232,10 +299,9 @@ const styles = StyleSheet.create({
     paddingVertical: space.s,
   },
   quickActionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 1,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
   },

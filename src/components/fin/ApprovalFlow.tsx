@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 
-import { formatMoney } from '@/domain/money';
+import { formatMoneyINR } from '@/domain/money';
 import { memberRemaining, useDomain } from '@/domain/store';
 
 import { ApprovalCard } from './ApprovalCard';
@@ -42,22 +42,22 @@ export function ApprovalFlow({ approvalId }: { approvalId: string }) {
         title="Approve once"
         subject={`${requester?.name ?? 'Member'} · ${approval.merchant}`}
         facts={[
-          { label: 'Amount', value: formatMoney(approval.amount), emphasis: true },
+          { label: 'Amount', value: formatMoneyINR(approval.amount), emphasis: true },
           { label: 'Merchant', value: approval.merchant },
           { label: 'Category', value: approval.category },
           {
             label: 'After this purchase',
             value:
               remaining !== undefined
-                ? `${formatMoney(Math.max(remaining - approval.amount, 0))} left this month`
+                ? `${formatMoneyINR(Math.max(remaining - approval.amount, 0))} left this month`
                 : '—',
           },
         ]}
         note={`One-time approval. ${requester?.name ?? 'The member'}'s rules stay unchanged.`}
-        cta={`Approve ${formatMoney(approval.amount)} once`}
+        cta={`Approve ${formatMoneyINR(approval.amount)} once`}
         onConfirm={() => {
           dispatch({ type: 'approve_once', approvalId: approval.id });
-          toast(`Approved ${approval.merchant} ${formatMoney(approval.amount)} once.`);
+          toast(`Approved ${approval.merchant} ${formatMoneyINR(approval.amount)} once.`);
         }}
         onClose={() => setConfirming(false)}
       />

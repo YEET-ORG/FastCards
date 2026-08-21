@@ -1,5 +1,7 @@
+import type { Ref } from "react";
 import type {
   StyleProp,
+  TextInput,
   TextInputProps,
   TextStyle,
   ViewStyle,
@@ -7,6 +9,8 @@ import type {
 
 interface IAnimatedInput extends Omit<TextInputProps, "placeholder"> {
   placeholders: string[];
+  /** Ref to the underlying TextInput, so callers can focus/blur it directly. */
+  readonly inputRef?: Ref<TextInput>;
   readonly animationInterval?: number;
   readonly containerStyle?: StyleProp<ViewStyle>;
   readonly inputWrapperStyle?: StyleProp<ViewStyle>;

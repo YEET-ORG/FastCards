@@ -12,7 +12,7 @@ import { useToast } from '@/components/fin/Toast';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
 import { font, radius, screenPad, space, type ColorTokens } from '@/design/tokens';
-import { formatMoney } from '@/domain/money';
+import { formatMoneyINR } from '@/domain/money';
 import { useDomain } from '@/domain/store';
 
 // Move money — real gateway flows: internal transfers between the
@@ -82,7 +82,7 @@ export default function MoveMoneyScreen() {
                   Available
                 </AppText>
                 <AppText variant="secondary" tabular>
-                  {formatMoney(direction === 0 ? state.balances.personal : state.balances.family)}
+                  {formatMoneyINR(direction === 0 ? state.balances.personal : state.balances.family)}
                 </AppText>
               </View>
             </>
@@ -111,7 +111,7 @@ export default function MoveMoneyScreen() {
                   Available · paid out on-chain by the treasury
                 </AppText>
                 <AppText variant="secondary" tabular>
-                  {formatMoney(state.balances.personal)}
+                  {formatMoneyINR(state.balances.personal)}
                 </AppText>
               </View>
             </>

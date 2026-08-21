@@ -20,7 +20,7 @@ import { PrivyProvider } from '@privy-io/expo';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Appearance, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -30,23 +30,103 @@ import { RestoringScreen } from '@/auth/RestoringScreen';
 import { SignInScreen } from '@/auth/SignInScreen';
 import { ToastProvider } from '@/components/fin/Toast';
 import { ThemeProvider, useTheme } from '@/design/theme';
+import { palettes, type ThemeName } from '@/design/tokens';
+import { CurrencyProvider } from '@/domain/currency';
 import { DomainProvider } from '@/domain/store';
+import {
+  hasCompletedOnboarding,
+  markOnboardingComplete,
+} from '@/onboarding/persistence';
+import { OnboardingScreen } from '@/onboarding/OnboardingScreen';
 
 Appearance.setColorScheme('light');
 SplashScreen.preventAutoHideAsync();
 
+/**
+ * Built once per mode instead of rebuilt inline on every render. The object
+ * is handed to `NavigationThemeProvider`, so a fresh identity re-renders
+ * every navigator and mounted screen — it must only change when the theme
+ * actually does.
+ */
+const NAV_THEMES: Record<ThemeName, typeof DefaultTheme> = {
+  white: buildNavTheme('white'),
+  black: buildNavTheme('black'),
+};
+
+function buildNavTheme(mode: ThemeName) {
+  const base = mode === 'black' ? DarkTheme : DefaultTheme;
+  const c = palettes[mode];
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      background: c.bg,
+      card: c.raised,
+      border: c.line,
+      text: c.textPrimary,
+      primary: c.accent,
+    },
+  };
+}
+
 function Gate() {
   const { session, restoring } = useAuth();
   const { colors } = useTheme();
+  const [onboardingDone, setOnboardingDone] = useState<Record<string, boolean> | null>(null);
+
+  useEffect(() => {
+    if (!session) return;
+    if (onboardingDone !== null && session.userId in onboardingDone) return;
+    let cancelled = false;
+    // A rejection here must not leave `onboardingDone` null forever — that
+    // renders RestoringScreen permanently, locking the user out of the app.
+    // Treat an unreadable flag as "not onboarded" and show the flow.
+    void hasCompletedOnboarding(session.userId)
+      .catch(() => false)
+      .then((done) => {
+        if (!cancelled) {
+          setOnboardingDone((prev) => ({ ...(prev ?? {}), [session.userId]: done }));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Re-check when the signed-in user changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.userId, onboardingDone]);
+
+  // Pinned to the one token it reads, so a palette swap does not hand the
+  // navigator a new options identity and re-render every screen under it.
+  const stackScreenOptions = useMemo(
+    () => ({ headerShown: false, contentStyle: { backgroundColor: colors.bg } }),
+    [colors.bg],
+  );
+
   if (restoring) return <RestoringScreen />;
   if (!session) return <SignInScreen />;
+  const done = onboardingDone?.[session.userId] ?? null;
+  if (done === null) return <RestoringScreen />;
+  if (!done) {
+    return (
+      <DomainProvider>
+        <OnboardingScreen
+          onComplete={() => {
+            // Enter the app even if the flag could not be written. Repeating
+            // onboarding next launch is a far better failure than a Continue
+            // button that silently does nothing.
+            void markOnboardingComplete(session.userId)
+              .catch(() => undefined)
+              .then(() =>
+                setOnboardingDone((prev) => ({ ...(prev ?? {}), [session.userId]: true })),
+              );
+          }}
+        />
+      </DomainProvider>
+    );
+  }
   return (
     <DomainProvider>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.bg },
-        }}>
+      <Stack screenOptions={stackScreenOptions}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="chat" />
         <Stack.Screen name="profile" />
@@ -66,7 +146,7 @@ function Gate() {
 }
 
 function ThemedApp() {
-  const { mode, colors, ready } = useTheme();
+  const { mode, ready } = useTheme();
   const [fontsLoaded] = useFonts({
     Fraunces_400Regular,
     Fraunces_500Medium,
@@ -82,26 +162,18 @@ function ThemedApp() {
     if (fontsLoaded && ready) SplashScreen.hideAsync();
   }, [fontsLoaded, ready]);
 
-  if (!fontsLoaded || !ready) return null;
+  // `colors` is `palettes[mode]`, a stable object per mode, so this only
+  // rebuilds on an actual theme change — not on every font/ready re-render.
+  const navTheme = NAV_THEMES[mode];
 
-  const navTheme = {
-    ...(mode === 'night' ? DarkTheme : DefaultTheme),
-    colors: {
-      ...(mode === 'night' ? DarkTheme.colors : DefaultTheme.colors),
-      background: colors.bg,
-      card: colors.raised,
-      border: colors.line,
-      text: colors.textPrimary,
-      primary: colors.accent,
-    },
-  };
+  if (!fontsLoaded || !ready) return null;
 
   return (
     <NavigationThemeProvider value={navTheme}>
       <PrivyProvider appId={PRIVY_APP_ID} {...(PRIVY_CLIENT_ID ? { clientId: PRIVY_CLIENT_ID } : {})}>
         <AuthProvider>
           <ToastProvider>
-            <StatusBar style={mode === 'night' ? 'light' : 'dark'} />
+            <StatusBar style={mode === 'black' ? 'light' : 'dark'} />
             <Gate />
           </ToastProvider>
         </AuthProvider>
@@ -114,7 +186,11 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={StyleSheet.absoluteFill}>
       <ThemeProvider>
-        <ThemedApp />
+        {/* Above ThemedApp, so onboarding — which mounts its own DomainProvider
+            — shares one currency rather than getting a second, divergent copy. */}
+        <CurrencyProvider>
+          <ThemedApp />
+        </CurrencyProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );

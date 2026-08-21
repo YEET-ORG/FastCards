@@ -3,7 +3,8 @@
 // live: Privy bearer token) and maps server rows (snake_case) onto the
 // app's domain types.
 
-import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+import { NativeModules, Platform } from 'react-native';
 
 import type { MemberHueId } from '@/design/tokens';
 import type {
@@ -16,9 +17,42 @@ import type {
   Transaction,
 } from '@/domain/types';
 
+/** The gateway's default port — keep in step with server/src/config.ts. */
+const API_PORT = 8787;
+
+/** In dev the gateway runs on the same machine as Metro, so whatever host
+ * served the bundle is also the API host. Deriving it keeps every device
+ * working with no per-machine setup — the old `10.0.2.2` default only ever
+ * resolves inside an emulator.
+ *
+ * `Constants.expoConfig.hostUri` is only populated in Expo Go, so fall back
+ * to the packager's script URL, which a dev client always has. On a
+ * USB-attached device that URL is `localhost:8081` (React Native sets up
+ * `adb reverse` for the packager); `npm run android:reverse` tunnels the
+ * API port the same way. Over Wi-Fi it carries the machine's LAN IP. */
+function packagerApiUrl(): string | undefined {
+  if (!__DEV__) return undefined;
+  const scriptUrl = (
+    NativeModules as { SourceCode?: { getConstants?: () => { scriptURL?: string } } }
+  ).SourceCode?.getConstants?.().scriptURL;
+  const host =
+    Constants.expoConfig?.hostUri?.split(':')[0] ?? scriptUrl?.match(/^https?:\/\/([^:/]+)/)?.[1];
+  return host ? `http://${host}:${API_PORT}` : undefined;
+}
+
 export const API_BASE =
   process.env.EXPO_PUBLIC_API_URL ??
-  Platform.select({ android: 'http://10.0.2.2:8991', default: 'http://localhost:8991' })!;
+  packagerApiUrl() ??
+  Platform.select({
+    android: `http://10.0.2.2:${API_PORT}`,
+    default: `http://localhost:${API_PORT}`,
+  })!;
+
+if (__DEV__) console.log('[api] base', API_BASE);
+
+/** Bound every request: an unroutable host otherwise sits on the OS TCP
+ * timeout and the gate shows a blank loading screen for minutes. */
+const REQUEST_TIMEOUT_MS = 15_000;
 
 export class ApiError extends Error {
   constructor(
@@ -37,25 +71,35 @@ async function request<T>(
   headers: AuthHeaders,
   init: { method?: string; body?: unknown; stepUp?: boolean } = {},
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: init.method ?? (init.body !== undefined ? 'POST' : 'GET'),
-    headers: {
-      'content-type': 'application/json',
-      ...headers,
-      // Mock step-up assertion — replaced by Privy MFA later.
-      ...(init.stepUp ? { 'x-auth-assertion': 'passkey-mock-ok' } : {}),
-    },
-    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-  });
-  const json = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new ApiError(
-      res.status,
-      (json as { error?: string })?.error ?? 'server_error',
-      (json as { message?: string })?.message ?? 'Something went wrong.',
-    );
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: init.method ?? (init.body !== undefined ? 'POST' : 'GET'),
+      headers: {
+        'content-type': 'application/json',
+        ...headers,
+        // Mock step-up assertion — replaced by Privy MFA later.
+        ...(init.stepUp ? { 'x-auth-assertion': 'passkey-mock-ok' } : {}),
+      },
+      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      signal: controller.signal,
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new ApiError(
+        res.status,
+        (json as { error?: string })?.error ?? 'server_error',
+        (json as { message?: string })?.message ?? 'Something went wrong.',
+      );
+    }
+    return json as T;
+  } finally {
+    // A timeout or transport failure stays a plain Error on purpose:
+    // DomainProvider branches on `instanceof ApiError` to tell an
+    // unreachable server from a server that answered.
+    clearTimeout(timer);
   }
-  return json as T;
 }
 
 // ------------------------------------------------------------- mappers
@@ -119,6 +163,7 @@ function mapCard(c: any): Card {
     variant: c.variant,
     status: c.status,
     last4: c.last4,
+    network: c.network === 'visa' || c.network === 'mastercard' ? c.network : undefined,
     memberId: c.member_id ?? undefined,
     purpose: c.expiry_note && c.variant === 'protected' ? 'Protected checkout' : undefined,
     monthlyCap: c.monthly_cap ?? undefined,

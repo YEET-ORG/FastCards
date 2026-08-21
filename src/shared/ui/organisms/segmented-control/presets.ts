@@ -1,14 +1,17 @@
 import type { ViewStyle } from "react-native";
 
+// Softened from the vendored default (#000 at 0.23) — that read as a hard
+// grey band under the app's light themes. The thumb should look lifted out
+// of its well, not stamped onto it.
 const SHADOW: ViewStyle = {
-  shadowColor: "#000",
+  shadowColor: "#101828",
   shadowOffset: {
     width: 0,
     height: 2,
   },
-  shadowOpacity: 0.23,
-  shadowRadius: 2.62,
-  elevation: 4,
+  shadowOpacity: 0.1,
+  shadowRadius: 6,
+  elevation: 2,
 } as const;
 const SegmentedControlPresets = {
   ios: {

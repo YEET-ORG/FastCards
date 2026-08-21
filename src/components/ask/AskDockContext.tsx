@@ -12,8 +12,13 @@ type AskDockController = {
   vaultOpen: boolean;
   askHome: boolean;
   scrollHidden: boolean;
+  /** Set from `useTabBarHeight()` by `TabBarSpacer`, not measured. */
   tabBarHeight: number;
   setTabBarHeight: (h: number) => void;
+  /** The nav bar morphs into the composer in place; this drives the morph. */
+  composerOpen: boolean;
+  openComposer: () => void;
+  closeComposer: () => void;
 };
 
 const AskDockContext = createContext<AskDockController | null>(null);
@@ -22,8 +27,13 @@ export function AskDockProvider({ children }: React.PropsWithChildren) {
   const [vaultOpen, setVaultOpen] = useState(false);
   const [askHome, setAskHome] = useState(false);
   const [scrollHidden, setScrollHidden] = useState(false);
+  // Overwritten on mount by `TabBarSpacer`; this only covers the first frame.
   const [tabBarHeight, setTabBarHeight] = useState(88);
+  const [composerOpen, setComposerOpen] = useState(false);
   const scrollFns = useRef<Record<string, () => void>>({});
+
+  const openComposer = useCallback(() => setComposerOpen(true), []);
+  const closeComposer = useCallback(() => setComposerOpen(false), []);
 
   const reportScroll = useCallback(
     (dir: ScrollDir) => {
@@ -54,8 +64,22 @@ export function AskDockProvider({ children }: React.PropsWithChildren) {
       scrollHidden: askHome ? false : scrollHidden,
       tabBarHeight,
       setTabBarHeight,
+      composerOpen,
+      openComposer,
+      closeComposer,
     }),
-    [vaultOpen, askHome, scrollHidden, tabBarHeight, reportScroll, registerScrollToTop, scrollToTop],
+    [
+      vaultOpen,
+      askHome,
+      scrollHidden,
+      tabBarHeight,
+      composerOpen,
+      openComposer,
+      closeComposer,
+      reportScroll,
+      registerScrollToTop,
+      scrollToTop,
+    ],
   );
 
   return <AskDockContext.Provider value={value}>{children}</AskDockContext.Provider>;

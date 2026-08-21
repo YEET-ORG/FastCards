@@ -2,9 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/design/AppText';
-import { useColors } from '@/design/theme';
-import { font, space } from '@/design/tokens';
-import { formatSigned, relativeTime } from '@/domain/money';
+import { useColors, useDepth } from '@/design/theme';
+import { font, radius, space } from '@/design/tokens';
+import { useMoney } from '@/domain/currency';
+import { relativeTime } from '@/domain/money';
 import type { Member, Transaction } from '@/domain/types';
 
 const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -28,7 +29,10 @@ export function TransactionRow({
   onPress?: () => void;
   showMember?: boolean;
 }) {
+  const { formatSigned } = useMoney();
   const colors = useColors();
+  const iconShade = useDepth('raise1');
+  const pressShade = useDepth('press');
   const declined = txn.status === 'declined';
   const credit = txn.direction === 'credit';
 
@@ -44,12 +48,17 @@ export function TransactionRow({
       disabled={!onPress}
       accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={`${txn.merchant}, ${formatSigned(txn.amount, txn.direction)}${declined ? ', declined' : ''}${credit ? ', received' : ''}`}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.cream }]}>
-      <View style={[styles.icon, { backgroundColor: colors.raised, borderColor: colors.line }]}>
+      style={({ pressed }) => [
+        styles.row,
+        // White has no cream/raised contrast to swap between, so the pressed
+        // state leans on depth; on Black the `inset` fill does the work.
+        pressed && { backgroundColor: colors.inset, boxShadow: pressShade },
+      ]}>
+      <View style={[styles.icon, { backgroundColor: colors.raised, boxShadow: iconShade }]}>
         <Ionicons
           name={categoryIcons[txn.category] ?? 'card-outline'}
           size={17}
-          color={declined ? colors.textTertiary : colors.textSecondary}
+          color={declined ? colors.textTertiary : colors.iconPrimary}
         />
       </View>
       <View style={styles.center}>
@@ -92,13 +101,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: space.s,
     marginHorizontal: -space.s,
-    borderRadius: 14,
+    borderRadius: radius.control,
   },
   icon: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
-    borderWidth: 1,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
   },

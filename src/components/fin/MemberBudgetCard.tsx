@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
 import { space } from '@/design/tokens';
-import { formatMoney } from '@/domain/money';
+import { useMoney } from '@/domain/currency';
 import type { Member } from '@/domain/types';
 
 import { Avatar, ProgressBar, RuleChip, StatusBadge } from './primitives';
@@ -19,6 +19,7 @@ export function MemberBudgetCard({
   hasPendingApproval?: boolean;
   onPress?: () => void;
 }) {
+  const { formatMoney } = useMoney();
   const colors = useColors();
   const hue = colors.member[member.hueId] ?? colors.member.pool;
   const limit = member.monthlyLimit;
