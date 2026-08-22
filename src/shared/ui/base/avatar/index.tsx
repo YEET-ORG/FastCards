@@ -22,6 +22,26 @@ import type { IAvatar } from "./types";
 const AnimatedPressable =
   Animated.createAnimatedComponent(Pressable);
 
+// Module-scope palette: allocated once instead of a fresh 15-element array on
+// every getBackgroundColor() call (it runs per render branch).
+const NAME_COLORS = [
+  "#FF6B6B",
+  "#4ECDC4",
+  "#45B7D1",
+  "#96CEB4",
+  "#FFEAA7",
+  "#DDA0DD",
+  "#98D8C8",
+  "#F7DC6F",
+  "#BB8FCE",
+  "#85C1E9",
+  "#FF8A80",
+  "#82B1FF",
+  "#B39DDB",
+  "#A5D6A7",
+  "#FFCC02",
+];
+
 export const Avatar: React.FC<IAvatar> & React.FunctionComponent<IAvatar> =
   memo<IAvatar>(
     ({
@@ -92,30 +112,12 @@ export const Avatar: React.FC<IAvatar> & React.FunctionComponent<IAvatar> =
         if (backgroundColor) return backgroundColor;
 
         if (image.name) {
-          const colors = [
-            "#FF6B6B",
-            "#4ECDC4",
-            "#45B7D1",
-            "#96CEB4",
-            "#FFEAA7",
-            "#DDA0DD",
-            "#98D8C8",
-            "#F7DC6F",
-            "#BB8FCE",
-            "#85C1E9",
-            "#FF8A80",
-            "#82B1FF",
-            "#B39DDB",
-            "#A5D6A7",
-            "#FFCC02",
-          ];
-
           let hash = 0;
           for (let i = 0; i < image.name.length; i++) {
             hash = image.name.charCodeAt(i) + ((hash << 5) - hash);
           }
 
-          return colors[Math.abs(hash) % colors.length];
+          return NAME_COLORS[Math.abs(hash) % NAME_COLORS.length];
         }
 
         return "#ccc";
@@ -254,7 +256,6 @@ export const Avatar: React.FC<IAvatar> & React.FunctionComponent<IAvatar> =
                   },
                 ]}
                 onLoad={() => {
-                  console.log("Image loaded!");
                   handleImageLoad();
                 }}
                 onError={(e) => {

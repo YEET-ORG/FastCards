@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { ApprovalFlow } from '@/components/fin/ApprovalFlow';
@@ -33,6 +33,27 @@ export default function MemberDetail() {
   const [proposedLimit, setProposedLimit] = useState<number | null>(null);
 
   const member = state.members.find((m) => m.id === id);
+
+  // Hooks must run unconditionally — these memoize derived data and only
+  // operate when the member exists; the early-return guard lives below them.
+  const memberTxns = useMemo(
+    () => (member ? state.transactions.filter((t) => t.memberId === member.id).slice(0, 5) : []),
+    [member, state.transactions],
+  );
+  const memberApprovals = useMemo(
+    () => (member ? pendingApprovals(state).filter((a) => a.requesterId === member.id) : []),
+    [member, state],
+  );
+  const txnRows = useMemo(
+    () =>
+      memberTxns.map((t) => ({
+        key: t.id,
+        txn: t,
+        onPress: () => router.push({ pathname: '/transaction/[id]', params: { id: t.id } }),
+      })),
+    [memberTxns, router],
+  );
+
   if (!member) {
     return (
       <Screen scroll={false}>
@@ -48,8 +69,6 @@ export default function MemberDetail() {
     member.monthlyLimit !== undefined
       ? member.monthlyLimit + (member.tempAllowance?.amount ?? 0)
       : undefined;
-  const memberTxns = state.transactions.filter((t) => t.memberId === member.id).slice(0, 5);
-  const memberApprovals = pendingApprovals(state).filter((a) => a.requesterId === member.id);
   const frozen = card?.status === 'frozen';
 
   const startAdjust = () => {
@@ -162,13 +181,13 @@ export default function MemberDetail() {
       {/* Recent activity */}
       <View>
         <SectionHeader title="Recent activity" />
-        {memberTxns.map((t) => (
+        {txnRows.map((row) => (
           <TransactionRow
-            key={t.id}
-            txn={t}
+            key={row.key}
+            txn={row.txn}
             member={member}
             showMember={false}
-            onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: t.id } })}
+            onPress={row.onPress}
           />
         ))}
       </View>

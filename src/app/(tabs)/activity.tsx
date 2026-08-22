@@ -48,6 +48,16 @@ export default function ActivityFeed() {
   );
 
   const feed = useMemo(() => {
+    // Resolved once per data change so the memoized TransactionRow only
+    // re-renders when its own row changes.
+    const rowProps = new Map<string, { member?: import('@/domain/types').Member; onPress: () => void }>();
+    for (const t of state.transactions) {
+      rowProps.set(t.id, {
+        member: state.members.find((m) => m.id === t.memberId),
+        onPress: () => router.push({ pathname: '/transaction/[id]', params: { id: t.id } }),
+      });
+    }
+
     const items: FeedItem[] = [
       ...state.transactions.map<FeedItem>((t) => ({ type: 'txn', at: t.at, txn: t })),
       ...state.events.map<FeedItem>((e) => ({ type: 'event', at: e.at, event: e })),
@@ -70,8 +80,8 @@ export default function ActivityFeed() {
       if (last && last.label === label) last.items.push(item);
       else groups.push({ label, items: [item] });
     }
-    return groups;
-  }, [state.transactions, state.events, filter]);
+    return { groups, rowProps };
+  }, [state.transactions, state.events, state.members, filter, router]);
 
   return (
     <Screen scrollToTopRef={scrollRef} onScrollDirection={dock.reportScroll}>
@@ -93,14 +103,14 @@ export default function ActivityFeed() {
         onChange={(i) => setFilter(FILTERS[i])}
       />
 
-      {feed.length === 0 ? (
+      {feed.groups.length === 0 ? (
         <View style={styles.empty}>
           <AppText variant="body" tone={colors.textSecondary}>
             Your activity will appear here.
           </AppText>
         </View>
       ) : (
-        feed.map((group) => (
+        feed.groups.map((group) => (
           <View key={group.label} style={{ gap: 2 }}>
             <AppText variant="label" style={{ marginBottom: space.s }}>
               {group.label}
@@ -110,8 +120,8 @@ export default function ActivityFeed() {
                 <TransactionRow
                   key={item.txn.id}
                   txn={item.txn}
-                  member={state.members.find((m) => m.id === item.txn.memberId)}
-                  onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: item.txn.id } })}
+                  member={feed.rowProps.get(item.txn.id)?.member}
+                  onPress={feed.rowProps.get(item.txn.id)?.onPress}
                 />
               ) : (
                 <View key={item.event.id} style={styles.eventRow}>

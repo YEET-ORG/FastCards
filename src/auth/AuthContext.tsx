@@ -217,8 +217,29 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         // Cleared only once the server has echoed it back as the session name —
         // an exchange that fell back to the seeded name must keep trying.
         if (claimed && s.name === claimed) clearSignUpName();
-        setHeaders(h);
-        setSession({ userId: s.userId, name: s.name, role: s.role, isAdmin: s.isAdmin });
+        // Guarded writes: the refresh runs every 5 minutes with identical
+        // data, and a fresh identity here re-renders all 21 useAuth consumers
+        // for nothing.
+        setHeaders((prev) => {
+          if (
+            prev &&
+            prev.authorization === h.authorization &&
+            prev['privy-id-token'] === h['privy-id-token'] &&
+            prev['x-user-id'] === h['x-user-id']
+          ) {
+            return prev;
+          }
+          return h;
+        });
+        setSession((prev) =>
+          prev &&
+          prev.userId === s.userId &&
+          prev.name === s.name &&
+          prev.role === s.role &&
+          prev.isAdmin === s.isAdmin
+            ? prev
+            : { userId: s.userId, name: s.name, role: s.role, isAdmin: s.isAdmin },
+        );
         setMode('privy');
         setPrivyError(null);
         // Raised once, and only for a login the user just performed: a session

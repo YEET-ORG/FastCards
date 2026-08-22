@@ -1,4 +1,4 @@
-import { memo, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -9,6 +9,9 @@ import { AiPulsePlaceholder, AiStreamingCursor } from '@/components/intent/AiPul
 import { TypingIndicator } from '@/components/intent/TypingIndicator';
 import { useColors } from '@/design/theme';
 import type { StoredMessage } from '@/store/chatStore';
+
+// Read once at module scope: the entrance config is only consumed at mount.
+const BUBBLE_ENTER = aiMessageEnter();
 
 /**
  * One message (AI_CHAT_UI_UX_SPEC §9). Column order is fixed:
@@ -31,6 +34,13 @@ function BubbleInner({
   const wrapRef = useRef<View>(null);
   const isUser = msg.role === 'user';
 
+  // Stable per message: ChatToolCard's memo needs a stable callback to hold.
+  const handleLifecycleChange = useCallback(
+    (status: 'pending' | 'processing' | 'confirmed' | 'failed' | 'cancelled', receipt?: import('@/api/client').Receipt) =>
+      onConfirmLifecycle(msg.id, status, receipt),
+    [msg.id, onConfirmLifecycle],
+  );
+
   const handleLongPress = () => {
     // Suppressed while generating.
     if (generating) return;
@@ -45,7 +55,7 @@ function BubbleInner({
     isUser && (msg.content || '').trim().length < 40 && !(msg.content || '').includes('\n');
 
   return (
-    <Animated.View entering={aiMessageEnter()}>
+    <Animated.View entering={BUBBLE_ENTER}>
       <Pressable onLongPress={handleLongPress} delayLongPress={400} style={styles.pressable}>
         <View ref={wrapRef} style={[styles.bubbleWrap, isUser ? styles.bubbleWrapUser : styles.bubbleWrapAssistant]}>
           <View style={isUser ? styles.bubbleCol : styles.assistantCol}>
@@ -64,7 +74,7 @@ function BubbleInner({
               <ChatToolCard
                 key={i}
                 card={card}
-                onLifecycleChange={(status, receipt) => onConfirmLifecycle(msg.id, status, receipt)}
+                onLifecycleChange={handleLifecycleChange}
               />
             ))}
 

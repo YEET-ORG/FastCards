@@ -79,5 +79,10 @@ export function useHeroBalance(opts?: { pagerEnabled?: boolean }): HeroBalance {
     [scopes, pager.index, pager.commitSeq, hidden, primaryCard],
   );
 
-  return { balanceProps, pan: pager.pan, owner, budgetRemaining };
+  // Assembled once: a fresh object per render re-renders every consumer
+  // (Home's shell, the onboarding flow) on every parent render.
+  return useMemo(
+    () => ({ balanceProps, pan: pager.pan, owner, budgetRemaining }),
+    [balanceProps, pager.pan, owner, budgetRemaining],
+  );
 }

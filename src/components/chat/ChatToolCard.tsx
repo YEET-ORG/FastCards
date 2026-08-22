@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { memo } from 'react';
 import { View } from 'react-native';
 
 import { type Receipt } from '@/api/client';
@@ -20,7 +21,12 @@ export type CardActionHandler = (action: CardAction) => void;
 
 const CARD_WIDTH_HINT = { confirm_preview: 'compact', receipt: 'compact' } as const;
 
-export function ChatToolCard({
+/**
+ * Shallow memo: lifecycle patches replace ONLY the changed card's object
+ * (unchanged siblings keep their reference, so they skip), and Bubble hands a
+ * stable per-message `onLifecycleChange`.
+ */
+export const ChatToolCard = memo(function ChatToolCard({
   card,
   onLifecycleChange,
 }: {
@@ -84,4 +90,4 @@ export function ChatToolCard({
         </CardShell>,
       );
   }
-}
+});

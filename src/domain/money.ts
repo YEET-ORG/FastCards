@@ -13,6 +13,17 @@ const inrWhole = new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 0,
 });
 
+// Hoisted like `inrWhole`: these are called per feed row, and building an Intl
+// formatter per call is the avoidable cost (Hermes constructs one each time).
+const timeShort = new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit' });
+const dayMonth = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' });
+const dayMonthLong = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'long' });
+const dayMonthYear = new Intl.DateTimeFormat('en-IN', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
+
 export function formatMoneyINR(amount: number): string {
   return inrWhole.format(amount);
 }
@@ -31,19 +42,18 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
   if (mins < 1) return 'Now';
   if (mins < 60) return `${mins}m`;
   const sameDay = then.toDateString() === now.toDateString();
-  const time = then.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+  const time = timeShort.format(then);
   if (sameDay) return time;
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (then.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return then.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  return dayMonth.format(then);
 }
 
 /** Exact timestamp for detail screens. */
 export function exactTime(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) +
-    ', ' + d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+  return dayMonthYear.format(d) + ', ' + timeShort.format(d);
 }
 
 /** Day bucket label for the Activity feed. */
@@ -53,5 +63,5 @@ export function dayLabel(iso: string, now: Date = new Date()): string {
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (then.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return then.toLocaleDateString('en-IN', { day: 'numeric', month: 'long' });
+  return dayMonthLong.format(then);
 }

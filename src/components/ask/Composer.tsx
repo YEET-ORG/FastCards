@@ -12,7 +12,7 @@
 // "Custom amount" tap.
 
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated, {
   useAnimatedKeyboard,
@@ -32,6 +32,19 @@ import { capsule, font, icon, radius } from '@/design/tokens';
 const ANDROID_PAN_CLEARANCE = capsule.height / 2 + 8;
 /** Keyboard travel over which the correction above is blended in. */
 const ANDROID_PAN_RAMP = 200;
+
+/** The keyboard subscription lives here, mounted only where it can ever lift
+ * (Android + `keyboardLift`), so a default Composer never pays for it. */
+function KeyboardLiftRow({ children }: { children: ReactNode }) {
+  const keyboard = useAnimatedKeyboard();
+  const liftStyle = useAnimatedStyle(() => {
+    if (Platform.OS === 'ios') return { transform: [{ translateY: 0 }] };
+    const kb = keyboard.height.value;
+    const lifted = Math.min(kb / ANDROID_PAN_RAMP, 1);
+    return { transform: [{ translateY: -ANDROID_PAN_CLEARANCE * lifted }] };
+  });
+  return <Animated.View style={[styles.row, liftStyle]}>{children}</Animated.View>;
+}
 
 export function Composer({
   onSubmit,
@@ -58,7 +71,6 @@ export function Composer({
   const inputRef = useRef<TextInput>(null);
   const lastFocusSignal = useRef<number | undefined>(undefined);
   const pressed = useSharedValue(0);
-  const keyboard = useAnimatedKeyboard();
   const [text, setText] = useState('');
   const hasText = text.trim().length > 0;
 
@@ -79,21 +91,14 @@ export function Composer({
   }, [focusSignal]);
 
   // The whole row rides the keyboard, not just the pill, so the send button
-  // stays beside it. iOS is a no-op: the screen's KeyboardAvoidingView owns
-  // the lift there.
-  const liftStyle = useAnimatedStyle(() => {
-    if (!keyboardLift || Platform.OS === 'ios') return { transform: [{ translateY: 0 }] };
-    const kb = keyboard.height.value;
-    const lifted = Math.min(kb / ANDROID_PAN_RAMP, 1);
-    return { transform: [{ translateY: -ANDROID_PAN_CLEARANCE * lifted }] };
-  });
-
+  // stays beside it — owned by KeyboardLiftRow, which only mounts where the
+  // lift can ever apply (Android + `keyboardLift`).
   const buttonScale = useAnimatedStyle(() => ({
     transform: [{ scale: 1 - pressed.value * 0.03 }],
   }));
 
-  return (
-    <Animated.View style={[styles.row, liftStyle]}>
+  const rowContent = (
+    <>
       <View style={[styles.pill, { backgroundColor: colors.raised, boxShadow: pillShade }]}>
         <TextInput
           ref={inputRef}
@@ -137,7 +142,13 @@ export function Composer({
           />
         </Pressable>
       </Animated.View>
-    </Animated.View>
+    </>
+  );
+
+  return keyboardLift && Platform.OS === 'android' ? (
+    <KeyboardLiftRow>{rowContent}</KeyboardLiftRow>
+  ) : (
+    <View style={styles.row}>{rowContent}</View>
   );
 }
 

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Linking, Platform, StyleSheet, Text, View, type TextStyle } from 'react-native';
 
 import { ChatFonts } from '@/constants/ai-ui';
@@ -140,19 +141,22 @@ function parseFenced(text: string): ParsedBlock[] {
   return blocks;
 }
 
-export function MarkdownText({
-  text,
-  theme,
-  invertedSurface = false,
-  suffix,
-  style,
-}: {
+interface MarkdownTextProps {
   text: string;
   theme: ColorTokens;
   invertedSurface?: boolean;
   suffix?: React.ReactNode;
   style?: TextStyle | TextStyle[];
-}) {
+}
+
+export const MarkdownText = memo(
+  function MarkdownText({
+  text,
+  theme,
+  invertedSurface = false,
+  suffix,
+  style,
+}: MarkdownTextProps) {
   const blocks = parseFenced(text);
 
   if (blocks.length === 0) {
@@ -294,7 +298,16 @@ export function MarkdownText({
       })}
     </View>
   );
-}
+  },
+  // Re-parse is the whole cost of this component. The suffix cursor only ever
+  // rides a message whose text is changing in the same update (single-shot
+  // backend), so text/theme/invertedSurface cover every render-affecting prop;
+  // `style` is derived from `theme` by the callers.
+  (prev: MarkdownTextProps, next: MarkdownTextProps) =>
+    prev.text === next.text &&
+    prev.theme === next.theme &&
+    prev.invertedSurface === next.invertedSurface,
+);
 
 const styles = StyleSheet.create({
   markdownRoot: { gap: 4 },

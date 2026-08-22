@@ -6,12 +6,10 @@ import type {
 import React, { useEffect, useRef } from "react";
 import {
   LayoutAnimation,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
-  UIManager,
   View,
 } from "react-native";
 import Animated, {
@@ -25,17 +23,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { scheduleOnRN } from "react-native-worklets";
 import { useColors } from "@/design/theme";
 
-if (Platform.OS === "android") {
-  if (UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-  }
-}
-
 interface ToastProps {
   toast: ToastType;
   index: number;
   onHeightChange?: (id: string, height: number) => void;
 }
+
+// Idempotency guard for handleDismiss (see there). Toast ids are unique per
+// show, so nothing ever needs to be removed from this set.
+const dismissedToastIds = new Set<string>();
 
 const getBackgroundColor = (type: ToastVariant) => {
   switch (type) {
@@ -134,6 +130,12 @@ export const Toast: React.FC<ToastProps> = ({ toast, index }) => {
   }, [index, toast.options.position, translateY, scale, opacity]);
 
   const handleDismiss = () => {
+    // Idempotent: the provider's duration timer and this component's exit
+    // timer can both fire at ~duration, and a stale exit timer can fire after
+    // unmount — onClose must run exactly once. Toast ids are unique per show,
+    // so a module-level set needs no reset (and no ref the compiler must trace).
+    if (dismissedToastIds.has(toast.id)) return;
+    dismissedToastIds.add(toast.id);
     dismiss(toast.id);
     toast.options.onClose?.();
   };
@@ -173,7 +175,7 @@ export const Toast: React.FC<ToastProps> = ({ toast, index }) => {
       },
     });
 
-    setTimeout(() => {
+    const entryTimer = setTimeout(() => {
       // opacity.value = withTiming(1, {
       //   duration: 500,
       //   easing: Easing.bezier(0.25, 0.46, 0.45, 0.94),
@@ -198,6 +200,7 @@ export const Toast: React.FC<ToastProps> = ({ toast, index }) => {
         easing: Easing.bezier(0.25, 0.46, 0.45, 0.94),
       });
     }, delay);
+    const entryTimerCleanup = () => clearTimeout(entryTimer);
 
     if (toast.options.duration > 0) {
       const exitDelay = Math.max(0, toast.options.duration - 500);
@@ -226,8 +229,13 @@ export const Toast: React.FC<ToastProps> = ({ toast, index }) => {
         }, 400);
       };
 
-      setTimeout(exitAnimations, exitDelay);
+      const exitTimer = setTimeout(exitAnimations, exitDelay);
+      return () => {
+        entryTimerCleanup();
+        clearTimeout(exitTimer);
+      };
     }
+    return entryTimerCleanup;
   }, [toast, opacity, translateY, scale, rotateZ, index]);
 
   // Animate expansion

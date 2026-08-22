@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -26,7 +26,7 @@ export default function InviteMemberScreen() {
   const { refresh } = useDomain();
   const toast = useToast();
   const colors = useColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
 
   const [name, setName] = useState('');
@@ -60,6 +60,11 @@ export default function InviteMemberScreen() {
   };
 
   const inviteCode = result?.rows.find((r) => r.label === 'Invite code')?.value;
+
+  const preparedFacts = useMemo(
+    () => (prepared ? prepared.facts.map((f, i) => ({ ...f, emphasis: i === 0 })) : null),
+    [prepared],
+  );
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + space.s }]}>
@@ -100,7 +105,7 @@ export default function InviteMemberScreen() {
             />
             <View style={{ gap: 6 }}>
               <AppText variant="label">Role</AppText>
-              <Segments dense labels={[...ROLE_LABELS]} index={roleIndex} onChange={setRoleIndex} />
+              <Segments dense labels={ROLE_LABELS} index={roleIndex} onChange={setRoleIndex} />
             </View>
             <TextInput
               value={limitText}
@@ -121,7 +126,7 @@ export default function InviteMemberScreen() {
           visible
           title="Review invitation"
           subject={prepared.subject}
-          facts={prepared.facts.map((f, i) => ({ ...f, emphasis: i === 0 }))}
+          facts={preparedFacts ?? []}
           note={prepared.note}
           cta={prepared.cta}
           onConfirm={async () => {

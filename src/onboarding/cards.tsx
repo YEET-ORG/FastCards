@@ -516,6 +516,7 @@ export function FundingReceiveCard({
   const [checking, setChecking] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const doneRef = useRef(false);
+  const checkingRef = useRef(false);
 
   // Load the deposit intent once (same endpoint the deposit screen uses).
   useEffect(() => {
@@ -543,7 +544,10 @@ export function FundingReceiveCard({
   }, [onSuccess]);
 
   const check = useCallback(async () => {
-    if (checking || doneRef.current) return;
+    // Ref guard: `checking` (the button state) must not be a dependency —
+    // every flip would rebuild `check` and restart the 5s poll interval.
+    if (checkingRef.current || doneRef.current) return;
+    checkingRef.current = true;
     setChecking(true);
     try {
       const res = await api.syncDeposits(headers);
@@ -554,9 +558,10 @@ export function FundingReceiveCard({
     } catch {
       // Poll failures are silent — the manual check surfaces nothing extra.
     } finally {
+      checkingRef.current = false;
       setChecking(false);
     }
-  }, [checking, headers, refresh, settle]);
+  }, [headers, refresh, settle]);
 
   // Poll the gateway so a completed deposit returns to the card automatically.
   useEffect(() => {

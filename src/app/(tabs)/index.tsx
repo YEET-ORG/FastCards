@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useRef } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useMemo, useRef } from 'react';
+import { ScrollView, StyleSheet, View, type GestureResponderEvent } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 
 import { useAskDock } from '@/components/ask/AskDockContext';
@@ -92,7 +92,23 @@ export default function AskHome() {
     [sheet],
   );
 
-  const recent = [...state.transactions].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 4);
+  const recent = useMemo(() => state.transactions.slice(0, 4), [state.transactions]);
+  const recentRows = useMemo(
+    () =>
+      recent.map((t) => ({
+        key: t.id,
+        txn: t,
+        member: state.members.find((m) => m.id === t.memberId),
+        onPress: (event: GestureResponderEvent, rect?: MorphOrigin) =>
+          sheet.openSheet({
+            variant: 'transaction',
+            txnId: t.id,
+            originY: event.nativeEvent.pageY,
+            originRect: rect,
+          }),
+      })),
+    [recent, state.members, sheet],
+  );
   const hue = colors.member[hero.owner?.hueId ?? 'rohan'];
 
   // Swiping anywhere on the wallet page changes scope, so the gesture lives
@@ -155,19 +171,12 @@ export default function AskHome() {
                 Your activity will appear here.
               </AppText>
             ) : (
-              recent.map((t) => (
+              recentRows.map((row) => (
                 <TransactionRow
-                  key={t.id}
-                  txn={t}
-                  member={state.members.find((m) => m.id === t.memberId)}
-                  onPress={(event, rect) =>
-                    sheet.openSheet({
-                      variant: 'transaction',
-                      txnId: t.id,
-                      originY: event.nativeEvent.pageY,
-                      originRect: rect,
-                    })
-                  }
+                  key={row.key}
+                  txn={row.txn}
+                  member={row.member}
+                  onPress={row.onPress}
                 />
               ))
             )}

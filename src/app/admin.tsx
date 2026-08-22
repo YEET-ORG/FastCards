@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -37,7 +37,7 @@ export default function AdminScreen() {
   const { headers, session } = useAuth();
   const toast = useToast();
   const colors = useColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [float, setFloat] = useState<number | null>(null);

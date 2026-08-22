@@ -1,5 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -44,11 +44,13 @@ interface Payment {
 const badgeFor = (status: string): BadgeStatus =>
   status === 'issued' ? 'active' : status === 'paid' ? 'approval' : status === 'rejected' ? 'declined' : 'pending';
 
+const CARD_TYPE_LABELS = ['Personal', 'Purpose'];
+
 export default function OrderCardScreen() {
   const { headers } = useAuth();
   const toast = useToast();
   const colors = useColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
 
   const [kyc, setKyc] = useState<Kyc | null>(null);
@@ -165,7 +167,7 @@ export default function OrderCardScreen() {
         ) : kyc === 'approved' ? (
           <Panel style={{ gap: space.l }}>
             <AppText variant="section">Order a card</AppText>
-            <Segments dense labels={['Personal', 'Purpose']} index={cardTypeIndex} onChange={setCardTypeIndex} />
+            <Segments dense labels={CARD_TYPE_LABELS} index={cardTypeIndex} onChange={setCardTypeIndex} />
             <TextInput
               value={nickname}
               onChangeText={setNickname}

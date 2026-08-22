@@ -1,5 +1,5 @@
 import { BlurView } from 'expo-blur';
-import { Pressable, Platform, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -46,7 +46,6 @@ export function SheetBackdrop({
         style={styles.fill}
         tint="dark"
         intensity={BLUR_INTENSITY}
-        experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
       />
       <Animated.View style={[styles.fill, styles.scrim]} />
       <Pressable

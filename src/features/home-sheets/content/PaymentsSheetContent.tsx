@@ -6,7 +6,7 @@ import {
 } from 'expo-camera';
 import * as SecureStore from 'expo-secure-store';
 import { useRouter } from 'expo-router';
-import { memo, useEffect, useRef, useState, type RefObject } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -166,10 +166,14 @@ function PaymentsContentInner({ presentation = 'screen', scrollOffsetOut, scroll
     setMode(0);
   };
 
-  const recent = state.transactions
-    .filter((t) => t.category === 'Withdrawal')
-    .sort((a, b) => b.at.localeCompare(a.at))
-    .slice(0, 4);
+  const recent = useMemo(
+    () =>
+      state.transactions
+        .filter((t) => t.category === 'Withdrawal')
+        .sort((a, b) => b.at.localeCompare(a.at))
+        .slice(0, 4),
+    [state.transactions],
+  );
 
   // `scrollOffsetOut` is written from a plain JS handler (not
   // `useAnimatedScrollHandler`, which returns a handler object only usable

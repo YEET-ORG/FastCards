@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -126,16 +127,19 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [toasts, dismiss]);
 
-  const value: ToastContextValue = {
-    toasts,
-    show,
-    update,
-    dismiss,
-    dismissAll,
-    expandedToasts,
-    expandToast,
-    collapseToast,
-  };
+  const value: ToastContextValue = useMemo(
+    () => ({
+      toasts,
+      show,
+      update,
+      dismiss,
+      dismissAll,
+      expandedToasts,
+      expandToast,
+      collapseToast,
+    }),
+    [toasts, show, update, dismiss, dismissAll, expandedToasts, expandToast, collapseToast],
+  );
 
   return (
     <ToastContext.Provider value={value}>{children}</ToastContext.Provider>

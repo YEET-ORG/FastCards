@@ -119,7 +119,7 @@ export function ChatSurface({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { headers } = useAuth();
+  const { session, headers } = useAuth();
   const toast = useToast();
   const router = useRouter();
   const { state, refresh } = useDomain();
@@ -475,7 +475,9 @@ export function ChatSurface({
         };
       });
       if (!cards) return;
-      useChatStore.getState().updateMessage(activeId, msgId, { cards });
+      // patched in place: a lifecycle change is not a new activity, so the
+      // conversation's recency (updatedAt) and the drawer sort stay put.
+      useChatStore.getState().patchMessage(activeId, msgId, { cards });
       if (status === 'confirmed' && receipt) {
         toast(`${receipt.title}.`);
         void refresh();
@@ -629,7 +631,7 @@ export function ChatSurface({
 
         {showHero ? (
           <View style={[styles.heroWrap, { paddingBottom: heroBottomInset }]} pointerEvents="box-none">
-            <ChatLandingHero visible={visible} hidden={isKeyboardVisible} />
+            <ChatLandingHero visible={visible} hidden={isKeyboardVisible} name={session?.name} />
           </View>
         ) : (
           <FlatList
@@ -703,7 +705,7 @@ export function ChatSurface({
           editable={!generating}
           multiline
           inputMaxHeight={44}
-          focusSignal={editFocusSignal}
+          focusSignal={editingMsg ? editFocusSignal : undefined}
           trailing={trailing}
           markMorph={markMorph}
           onTrailingPress={handleTrailingPress}

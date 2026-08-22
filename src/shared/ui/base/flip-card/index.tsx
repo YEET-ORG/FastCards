@@ -1,4 +1,4 @@
-import React, { createContext, memo, useContext, useState } from "react";
+import React, { createContext, memo, useContext, useMemo, useState } from "react";
 import { View, Pressable, StyleSheet, Platform, ViewStyle } from "react-native";
 import Animated, {
   useSharedValue,
@@ -73,22 +73,29 @@ export const FlipCard: React.FC<FlipCardProps> & {
     onFlip?.(newFlippedState);
   };
 
+  // Stable identity: a fresh context value per render re-renders every memo'd
+  // Front/Back/Trigger (their memos are defeated by context identity).
+  const contextValue = useMemo<FlipCardContextValue>(
+    () => ({
+      isFlipped,
+      flip,
+      width,
+      height,
+      borderRadius,
+      blurIntensity,
+      animationDuration,
+      rotation,
+      scale,
+      tint: blurTint || "light",
+      scaleEnabled: scaleOnPress,
+    }),
+    // flip reads isFlipped via closure; rotation/scale are stable shared values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isFlipped, width, height, borderRadius, blurIntensity, animationDuration, blurTint, scaleOnPress],
+  );
+
   return (
-    <FlipCardContext.Provider
-      value={{
-        isFlipped,
-        flip,
-        width,
-        height,
-        borderRadius,
-        blurIntensity,
-        animationDuration,
-        rotation,
-        scale,
-        tint: blurTint || "light",
-        scaleEnabled: scaleOnPress,
-      }}
-    >
+    <FlipCardContext.Provider value={contextValue}>
       <View style={[styles.container, containerStyle, { width, height }]}>
         {children}
       </View>

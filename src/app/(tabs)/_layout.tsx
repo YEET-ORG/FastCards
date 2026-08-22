@@ -12,6 +12,15 @@ import {
 import { useColors } from '@/design/theme';
 import { SheetHostProvider } from '@/features/home-sheets/SheetHost';
 
+// Pinned identities: fresh `options` literals per render re-render the whole
+// navigator subtree whenever TabLayoutInner re-renders (dock value changes).
+const TAB_OPTIONS = {
+  index: { title: 'Ask' },
+  cards: { title: 'Cards' },
+  family: { title: 'Family' },
+  activity: { title: 'Activity' },
+} as const;
+
 /**
  * The nav bar renders outside the navigator so the composer's scrim can sit
  * between the scenes and the bar — a child of the navigator's `tabBar` slot
@@ -52,10 +61,10 @@ function TabLayoutInner() {
   return (
     <View style={styles.root}>
       <Tabs tabBar={renderTabBar} screenOptions={screenOptions}>
-        <Tabs.Screen name="index" options={{ title: 'Ask' }} />
-        <Tabs.Screen name="cards" options={{ title: 'Cards' }} />
-        <Tabs.Screen name="family" options={{ title: 'Family' }} />
-        <Tabs.Screen name="activity" options={{ title: 'Activity' }} />
+        <Tabs.Screen name="index" options={TAB_OPTIONS.index} />
+        <Tabs.Screen name="cards" options={TAB_OPTIONS.cards} />
+        <Tabs.Screen name="family" options={TAB_OPTIONS.family} />
+        <Tabs.Screen name="activity" options={TAB_OPTIONS.activity} />
       </Tabs>
       {nav && !dock.chatMode ? (
         <Animated.View pointerEvents="box-none" style={[styles.navOverlay, navSlide]}>

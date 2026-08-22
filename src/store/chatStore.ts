@@ -67,6 +67,8 @@ interface ChatStoreActions {
   toggleArchived: (id: string) => void;
   addMessage: (convId: string, msg: StoredMessage) => void;
   updateMessage: (convId: string, msgId: string, patch: Partial<StoredMessage>) => void;
+  /** In-place patch that does NOT bump `updatedAt` (keeps drawer sort stable). */
+  patchMessage: (convId: string, msgId: string, patch: Partial<StoredMessage>) => void;
   patchStreamingMessage: (convId: string, msgId: string, patch: Partial<StoredMessage>) => void;
   setTitle: (convId: string, title: string) => void;
   clearMessages: (convId: string) => void;
@@ -107,6 +109,17 @@ function capPersistedConversations(
   pinnedIds: string[],
 ): Conversation[] {
   if (conversations.length <= MAX_PERSISTED_CONVERSATIONS) {
+    // Already under every cap: return the SAME array. A mapped copy allocates
+    // new objects on every mutation and churns the persist signature for no
+    // reason.
+    let needsTrim = false;
+    for (const c of conversations) {
+      if (c.messages.length > MAX_PERSISTED_MESSAGES_PER_CONVERSATION) {
+        needsTrim = true;
+        break;
+      }
+    }
+    if (!needsTrim) return conversations;
     return conversations.map((c) => ({ ...c, messages: capConversationMessages(c.messages) }));
   }
   const pinned = new Set(pinnedIds);
@@ -151,19 +164,19 @@ function createPersistStorage<S>(
   { throttleMs }: { throttleMs: number },
 ): PersistStorage<S> {
   let pending: StorageValue<S> | null = null;
-  let pendingSignature: string | null = null;
   let lastWrittenSignature: string | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let lastWriteAt = 0;
 
   const doWrite = (name: string) => {
     const value = pending;
-    const signature = pendingSignature;
     pending = null;
-    pendingSignature = null;
     timer = null;
     lastWriteAt = Date.now();
-    if (value === null || signature === null) return;
+    if (value === null) return;
+    // Stringified here, at write time — the store mutates many times a
+    // second, and the throttle is the right place to pay the serialize.
+    const signature = JSON.stringify(value);
     if (signature === lastWrittenSignature) return;
     lastWrittenSignature = signature;
     void storage
@@ -192,9 +205,8 @@ function createPersistStorage<S>(
       }
     },
     setItem: (name, value) => {
-      const signature = JSON.stringify(value);
+      // Signature is computed in doWrite at write time — see the comment there.
       pending = value;
-      pendingSignature = signature;
       const elapsed = Date.now() - lastWriteAt;
       if (timer === null && elapsed >= throttleMs) {
         doWrite(name);
@@ -207,7 +219,6 @@ function createPersistStorage<S>(
     },
     removeItem: (name) => {
       pending = null;
-      pendingSignature = null;
       if (timer !== null) {
         clearTimeout(timer);
         timer = null;
@@ -315,6 +326,20 @@ export const useChatStore = create<ChatStore>()(
                   ...c,
                   messages: c.messages.map((m) => (m.id === msgId ? { ...m, ...patch } : m)),
                   updatedAt: Date.now(),
+                },
+          ),
+        })),
+
+      patchMessage: (convId, msgId, patch) =>
+        // Does NOT touch updatedAt — used for in-place patches (card lifecycle)
+        // so the drawer's recency sort and the header stay put.
+        set((s) => ({
+          conversations: s.conversations.map((c) =>
+            c.id !== convId
+              ? c
+              : {
+                  ...c,
+                  messages: c.messages.map((m) => (m.id === msgId ? { ...m, ...patch } : m)),
                 },
           ),
         })),

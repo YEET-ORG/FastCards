@@ -68,7 +68,7 @@ export const AnimatedProgressBar: React.FC<AnimatedProgressBarProps> = ({
       indeterminateValue.value = withRepeat(
         withTiming(1, { duration: 1500, easing: Easing.linear }),
         -1,
-        false,
+        true,
       );
     } else {
       indeterminateValue.value = 0;
@@ -100,6 +100,9 @@ export const AnimatedProgressBar: React.FC<AnimatedProgressBarProps> = ({
 
   const progressBarStyle = useAnimatedStyle(() => {
     if (indeterminate) {
+      // `indeterminateValue` is driven by the effect's withRepeat — never
+      // create a new animation inside the style worklet (it would restart on
+      // every frame).
       return {
         position: "absolute",
         left: 0,
@@ -110,14 +113,7 @@ export const AnimatedProgressBar: React.FC<AnimatedProgressBarProps> = ({
         borderRadius,
         transform: [
           {
-            translateX: withRepeat(
-              withTiming(containerWidth * 0.7, {
-                duration: 1500,
-                easing: Easing.linear,
-              }),
-              -1,
-              true,
-            ),
+            translateX: indeterminateValue.value * containerWidth * 0.7,
           },
         ],
       };

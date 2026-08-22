@@ -3,7 +3,7 @@
 // the live card; `events` is the append-only visible thread. Only the
 // last assistant message is "active" and renders a card.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -59,7 +59,7 @@ function wait(ms: number): Promise<void> {
   });
 }
 
-export function OnboardingFlow({
+export const OnboardingFlow = memo(function OnboardingFlow({
   userName,
   householdName,
   membersCount,
@@ -504,7 +504,7 @@ export function OnboardingFlow({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: { flex: 1 },

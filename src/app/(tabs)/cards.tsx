@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Extrapolation,
@@ -94,7 +94,23 @@ export default function CardsHub() {
       ? selected.monthlyCap + (member?.tempAllowance?.amount ?? 0)
       : undefined;
   const remaining = selected && effectiveCap !== undefined ? effectiveCap - selected.spentThisMonth : undefined;
-  const cardTxns = selected ? state.transactions.filter((t) => t.cardId === selected.id).slice(0, 4) : [];
+  const cardTxns = useMemo(
+    () => (selected ? state.transactions.filter((t) => t.cardId === selected.id).slice(0, 4) : []),
+    [selected, state.transactions],
+  );
+
+  // Built once per (txns, members) change so the memoized TransactionRow only
+  // re-renders when its own row data actually changes.
+  const txnRows = useMemo(
+    () =>
+      cardTxns.map((t) => ({
+        key: t.id,
+        txn: t,
+        member: state.members.find((m) => m.id === t.memberId),
+        onPress: () => router.push({ pathname: '/transaction/[id]', params: { id: t.id } }),
+      })),
+    [cardTxns, state.members, router],
+  );
 
   const frozen = selected?.status === 'frozen';
   const closed = selected?.status === 'closed';
@@ -232,13 +248,13 @@ export default function CardsHub() {
               No activity on this card yet.
             </AppText>
           ) : (
-            cardTxns.map((t) => (
+            txnRows.map((row) => (
               <TransactionRow
-                key={t.id}
-                txn={t}
-                member={state.members.find((m) => m.id === t.memberId)}
+                key={row.key}
+                txn={row.txn}
+                member={row.member}
                 showMember={false}
-                onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: t.id } })}
+                onPress={row.onPress}
               />
             ))
           )}

@@ -5,6 +5,7 @@
 
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback } from 'react';
 
 import { useAuth } from '@/auth/AuthContext';
 import { useHeroBalance } from '@/components/fin/useHeroBalance';
@@ -35,10 +36,13 @@ export function OnboardingScreen({ onComplete }: Props) {
   // Throwing variant on purpose: the flow prints "Your monthly budget is
   // set." on resolve, so a failed write must reject and roll the step back
   // rather than resolve quietly into a false confirmation.
-  const handleSetBudget = async (amount: number) => {
-    if (!hero.owner) throw new Error('No household owner found');
-    await dispatchOrThrow({ type: 'set_monthly_limit', memberId: hero.owner.id, amount });
-  };
+  const handleSetBudget = useCallback(
+    async (amount: number) => {
+      if (!hero.owner) throw new Error('No household owner found');
+      await dispatchOrThrow({ type: 'set_monthly_limit', memberId: hero.owner.id, amount });
+    },
+    [hero.owner, dispatchOrThrow],
+  );
 
   return (
     <View style={[styles.root, { backgroundColor: colors.bg, paddingTop: insets.top + space.s }]}>

@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -12,16 +11,24 @@ import { useReduceMotion } from '@/design/motion';
  * model, so the hero is always "ready" — the loading pill stays available for
  * future use but is not driven by a model gate.
  */
-const HERO_TITLE = 'How can I help today?';
 
-export function ChatLandingHero({ visible, hidden = false }: { visible: boolean; hidden?: boolean }) {
+export function ChatLandingHero({
+  visible,
+  hidden = false,
+  name,
+}: {
+  visible: boolean;
+  hidden?: boolean;
+  name?: string;
+}) {
   const colors = useColors();
   const reduceMotion = useReduceMotion();
   const { width } = useWindowDimensions();
   const contentWidth = Math.min(width - 40, 520);
   const compact = width < 390;
-  const titleSize = compact ? 31 : 34;
-  const titleLineHeight = compact ? 37 : 40;
+  const titleSize = compact ? 37 : 41;
+  const titleLineHeight = compact ? 43 : 47;
+  const title = name ? `Hey ${name}, how can I help?` : 'How can I help?';
 
   // The whole hero steps aside while the input is focused — the keyboard
   // owns the surface, so the hero fades rather than competing with it.
@@ -41,10 +48,6 @@ export function ChatLandingHero({ visible, hidden = false }: { visible: boolean;
         style={[styles.heroBlock, { maxWidth: contentWidth }, heroStyle]}
         accessible={false}
         accessibilityElementsHidden={!visible || hidden}>
-        <View
-          style={[styles.logoDisc, { backgroundColor: colors.inset, borderColor: colors.line }]}>
-          <Ionicons name="sparkles" size={44} color={colors.accentInk} />
-        </View>
         <Text
           style={[
             styles.title,
@@ -53,10 +56,7 @@ export function ChatLandingHero({ visible, hidden = false }: { visible: boolean;
           adjustsFontSizeToFit
           minimumFontScale={0.85}
           numberOfLines={2}>
-          {HERO_TITLE}
-        </Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Ask about spending, cards, family or shopping.
+          {title}
         </Text>
       </Animated.View>
     </View>
@@ -66,33 +66,19 @@ export function ChatLandingHero({ visible, hidden = false }: { visible: boolean;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    paddingTop: 16,
     width: '100%',
   },
   heroBlock: {
-    alignItems: 'center',
-    gap: 28,
+    alignItems: 'flex-start',
+    paddingHorizontal: AiSpacing.conversationPaddingH,
     width: '100%',
   },
-  logoDisc: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 1,
-  },
   title: {
-    fontFamily: ChatFonts.medium,
+    fontFamily: ChatFonts.bold,
     letterSpacing: -0.55,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontFamily: ChatFonts.regular,
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: 'center',
-    paddingHorizontal: AiSpacing.conversationPaddingH,
+    textAlign: 'left',
   },
 });

@@ -121,23 +121,24 @@ function Gate() {
   // nothing to wait for — only a restored session consults the stored flag.
   if (!justSignedIn && done === null) return <RestoringScreen />;
   if (justSignedIn || !done) {
+    // Stable identity — a fresh closure here defeats OnboardingFlow's memo
+    // on every Gate re-render (auth refresh, theme change).
+    const handleOnboardingComplete = () => {
+      // Enter the app even if the flag could not be written. Repeating
+      // onboarding next launch is a far better failure than a Continue
+      // button that silently does nothing.
+      void markOnboardingComplete(session.userId)
+        .catch(() => undefined)
+        .then(() => {
+          // Both together: either alone would leave a render where the
+          // gate still points at onboarding it has already finished.
+          setOnboardingDone((prev) => ({ ...(prev ?? {}), [session.userId]: true }));
+          clearJustSignedIn();
+        });
+    };
     return (
       <DomainProvider>
-        <OnboardingScreen
-          onComplete={() => {
-            // Enter the app even if the flag could not be written. Repeating
-            // onboarding next launch is a far better failure than a Continue
-            // button that silently does nothing.
-            void markOnboardingComplete(session.userId)
-              .catch(() => undefined)
-              .then(() => {
-                // Both together: either alone would leave a render where the
-                // gate still points at onboarding it has already finished.
-                setOnboardingDone((prev) => ({ ...(prev ?? {}), [session.userId]: true }));
-                clearJustSignedIn();
-              });
-          }}
-        />
+        <OnboardingScreen onComplete={handleOnboardingComplete} />
       </DomainProvider>
     );
   }

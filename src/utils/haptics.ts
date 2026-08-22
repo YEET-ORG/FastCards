@@ -9,7 +9,9 @@ import { Platform, Vibration } from 'react-native';
 
 function runHaptic(fn: () => Promise<void> | void) {
   try {
-    void fn();
+    // Async rejections are not caught by the try/catch — swallow them too, so
+    // a haptic failure can never surface as an unhandled rejection.
+    void Promise.resolve(fn()).catch(() => undefined);
   } catch {
     // swallow
   }

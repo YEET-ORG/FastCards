@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRef } from 'react';
+import { memo, useRef } from 'react';
 import { Pressable, StyleSheet, View, type GestureResponderEvent } from 'react-native';
 
 import { AppText } from '@/design/AppText';
 import { useColors, useDepth } from '@/design/theme';
-import { font, radius, space } from '@/design/tokens';
+import { font, icon, radius, space } from '@/design/tokens';
 import { useMoney } from '@/domain/currency';
 import { relativeTime } from '@/domain/money';
 import type { Member, Transaction } from '@/domain/types';
@@ -20,7 +20,7 @@ const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
   Deposit: 'arrow-down-circle-outline',
 };
 
-export function TransactionRow({
+export const TransactionRow = memo(function TransactionRow({
   txn,
   member,
   onPress,
@@ -85,7 +85,7 @@ export function TransactionRow({
       <View style={[styles.icon, { backgroundColor: colors.raised, boxShadow: iconShade }]}>
         <Ionicons
           name={categoryIcons[txn.category] ?? 'card-outline'}
-          size={17}
+          size={icon.meta}
           color={declined ? colors.textTertiary : colors.iconPrimary}
         />
       </View>
@@ -119,7 +119,7 @@ export function TransactionRow({
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   row: {

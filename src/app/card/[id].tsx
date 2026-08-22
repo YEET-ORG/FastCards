@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -34,7 +34,7 @@ export default function CardDetail() {
   const router = useRouter();
   const toast = useToast();
   const colors = useColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const reduceMotion = useReduceMotion();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -42,6 +42,40 @@ export default function CardDetail() {
   const [sensitive, setSensitive] = useState<{ cardNumber?: string; expiry?: string; cvv?: string } | null>(null);
 
   const card = state.cards.find((c) => c.id === id);
+
+  // Hooks must run unconditionally — these memoize derived data and only
+  // operate when the card exists; the early-return guard lives below them.
+  const member = card?.memberId ? state.members.find((m) => m.id === card.memberId) : undefined;
+  const cardTxns = useMemo(
+    () => (card ? state.transactions.filter((t) => t.cardId === card.id).slice(0, 5) : []),
+    [card, state.transactions],
+  );
+
+  const ruleChips = useMemo(() => {
+    if (!card) return [];
+    const chips: { label: string; state?: 'active' | 'off' | 'temporary' }[] = [];
+    if (card.monthlyCap !== undefined)
+      chips.push({ label: `${formatMoney(card.monthlyCap)} / month` });
+    if (card.approvalAbove !== undefined)
+      chips.push({ label: `Ask > ${formatMoney(card.approvalAbove)}` });
+    chips.push({ label: card.channels.online ? 'Online on' : 'Online off', state: card.channels.online ? 'active' : 'off' });
+    chips.push({ label: card.channels.atm ? 'ATM on' : 'ATM off', state: card.channels.atm ? 'active' : 'off' });
+    if (member?.tempAllowance)
+      chips.push({ label: `+${formatMoney(member.tempAllowance.amount)} temp`, state: 'temporary' });
+    return chips;
+  }, [card, member, formatMoney]);
+
+  const txnRows = useMemo(
+    () =>
+      cardTxns.map((t) => ({
+        key: t.id,
+        txn: t,
+        member: state.members.find((m) => m.id === t.memberId),
+        onPress: () => router.push({ pathname: '/transaction/[id]', params: { id: t.id } }),
+      })),
+    [cardTxns, state.members, router],
+  );
+
   if (!card) {
     return (
       <Screen scroll={false}>
@@ -51,23 +85,11 @@ export default function CardDetail() {
     );
   }
 
-  const member = card.memberId ? state.members.find((m) => m.id === card.memberId) : undefined;
   const frozen = card.status === 'frozen';
   const closed = card.status === 'closed';
   const effectiveCap =
     card.monthlyCap !== undefined ? card.monthlyCap + (member?.tempAllowance?.amount ?? 0) : undefined;
   const remaining = effectiveCap !== undefined ? effectiveCap - card.spentThisMonth : undefined;
-  const cardTxns = state.transactions.filter((t) => t.cardId === card.id).slice(0, 5);
-
-  const ruleChips: { label: string; state?: 'active' | 'off' | 'temporary' }[] = [];
-  if (card.monthlyCap !== undefined)
-    ruleChips.push({ label: `${formatMoney(card.monthlyCap)} / month` });
-  if (card.approvalAbove !== undefined)
-    ruleChips.push({ label: `Ask > ${formatMoney(card.approvalAbove)}` });
-  ruleChips.push({ label: card.channels.online ? 'Online on' : 'Online off', state: card.channels.online ? 'active' : 'off' });
-  ruleChips.push({ label: card.channels.atm ? 'ATM on' : 'ATM off', state: card.channels.atm ? 'active' : 'off' });
-  if (member?.tempAllowance)
-    ruleChips.push({ label: `+${formatMoney(member.tempAllowance.amount)} temp`, state: 'temporary' });
 
   const startReveal = async () => {
     if (closed) {
@@ -185,13 +207,13 @@ export default function CardDetail() {
             No activity on this card yet.
           </AppText>
         ) : (
-          cardTxns.map((t) => (
+          txnRows.map((row) => (
             <TransactionRow
-              key={t.id}
-              txn={t}
-              member={state.members.find((m) => m.id === t.memberId)}
+              key={row.key}
+              txn={row.txn}
+              member={row.member}
               showMember={false}
-              onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: t.id } })}
+              onPress={row.onPress}
             />
           ))
         )}

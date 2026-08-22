@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 
 import { Composer } from '@/components/ask/Composer';
@@ -32,7 +32,7 @@ export default function CardRules() {
   const router = useRouter();
   const toast = useToast();
   const colors = useColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [editing, setEditing] = useState<'limit' | 'threshold' | null>(null);
   const [amountText, setAmountText] = useState('');

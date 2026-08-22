@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useAskDock } from '@/components/ask/AskDockContext';
@@ -10,7 +10,7 @@ import { HeaderIconButton, Panel, Screen, ScreenHeader } from '@/components/fin/
 import { AvatarGroup } from '@/shared/ui/base/avatar-group';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
-import { space } from '@/design/tokens';
+import { icon, space } from '@/design/tokens';
 import { useMoney } from '@/domain/currency';
 import { cardForMember, pendingApprovals, useDomain } from '@/domain/store';
 
@@ -30,7 +30,32 @@ export default function FamilyDashboard() {
   );
 
   const remaining = state.household.budgetCap - state.household.budgetSpent;
-  const pending = pendingApprovals(state);
+  const pending = useMemo(() => pendingApprovals(state), [state]);
+
+  // Stable identity for AvatarGroup's memo: built once per members/hues change.
+  const avatarItems = useMemo(
+    () =>
+      state.members.map((m) => ({
+        id: m.id,
+        name: m.name,
+        color: colors.member[m.hueId]?.fill ?? colors.member.pool.fill,
+      })),
+    [state.members, colors.member],
+  );
+
+  // Per-member rows with stable callbacks, so the memoized MemberBudgetCard
+  // only re-renders when its own member/pending state changes.
+  const memberRows = useMemo(
+    () =>
+      state.members.map((m) => ({
+        key: m.id,
+        member: m,
+        cardFrozen: cardForMember(state, m.id)?.status === 'frozen',
+        hasPendingApproval: pending.some((a) => a.requesterId === m.id),
+        onPress: () => router.push({ pathname: '/member/[id]', params: { id: m.id } }),
+      })),
+    [state, pending, router],
+  );
 
   return (
     <Screen scrollToTopRef={scrollRef} onScrollDirection={dock.reportScroll}>
@@ -47,11 +72,7 @@ export default function FamilyDashboard() {
 
       <View style={styles.avatarStrip}>
         <AvatarGroup
-          avatars={state.members.map((m) => ({
-            id: m.id,
-            name: m.name,
-            color: colors.member[m.hueId]?.fill ?? colors.member.pool.fill,
-          }))}
+          avatars={avatarItems}
           size={52}
           overlap={16}
           onPress={(id) => router.push({ pathname: '/member/[id]', params: { id } })}
@@ -69,7 +90,7 @@ export default function FamilyDashboard() {
         <AppText variant="secondary" tone={colors.textTertiary}>
           {formatMoney(state.household.budgetSpent)} spent of the {formatMoney(state.household.budgetCap)} budget
         </AppText>
-        <ProgressBar value={state.household.budgetSpent / state.household.budgetCap} style={{ marginTop: 4 }} />
+        <ProgressBar value={state.household.budgetSpent / state.household.budgetCap} style={{ marginTop: space.xs }} />
       </Panel>
 
       {pending.length > 0 ? (
@@ -82,7 +103,7 @@ export default function FamilyDashboard() {
             { backgroundColor: colors.warningDim, borderColor: colors.warning },
             pressed && { opacity: 0.8 },
           ]}>
-          <Ionicons name="hand-left-outline" size={17} color={colors.warningInk} />
+          <Ionicons name="hand-left-outline" size={icon.meta} color={colors.warningInk} />
           <AppText variant="body" style={{ flex: 1 }}>
             {pending.length} purchase{pending.length > 1 ? 's' : ''} need{pending.length > 1 ? '' : 's'} approval
           </AppText>
@@ -97,18 +118,15 @@ export default function FamilyDashboard() {
         {state.members.length === 0 ? (
           <AppText variant="secondary">Bring your household into one view.</AppText>
         ) : (
-          state.members.map((m) => {
-            const card = cardForMember(state, m.id);
-            return (
-              <MemberBudgetCard
-                key={m.id}
-                member={m}
-                cardFrozen={card?.status === 'frozen'}
-                hasPendingApproval={pending.some((a) => a.requesterId === m.id)}
-                onPress={() => router.push({ pathname: '/member/[id]', params: { id: m.id } })}
-              />
-            );
-          })
+          memberRows.map((row) => (
+            <MemberBudgetCard
+              key={row.key}
+              member={row.member}
+              cardFrozen={row.cardFrozen}
+              hasPendingApproval={row.hasPendingApproval}
+              onPress={row.onPress}
+            />
+          ))
         )}
       </View>
 

@@ -1,14 +1,15 @@
+import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
-import { space } from '@/design/tokens';
+import { radius, space } from '@/design/tokens';
 import { useMoney } from '@/domain/currency';
 import type { Member } from '@/domain/types';
 
 import { Avatar, ProgressBar, RuleChip, StatusBadge } from './primitives';
 
-export function MemberBudgetCard({
+export const MemberBudgetCard = memo(function MemberBudgetCard({
   member,
   cardFrozen,
   hasPendingApproval,
@@ -85,12 +86,12 @@ export function MemberBudgetCard({
       )}
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderRadius: 18,
+    borderRadius: radius.tile,
     padding: space.l,
     gap: space.m,
   },

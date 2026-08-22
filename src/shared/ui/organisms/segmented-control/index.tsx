@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useRef } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   Dimensions,
   StyleSheet,
@@ -126,44 +126,49 @@ const SegmentedControl: React.FC<ISegmentedControl> &
     };
   });
 
-  const panGesture = Gesture.Pan()
-    .minDistance(10)
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .minDistance(10)
 
-    .onStart(() => {
-      isDragging.value = true;
-      dragStartIndex.current = currentIndex;
-      if (disableScaleEffect) return;
-      activeScale.value = withSpring<number>(1.2, {
-        stiffness: 300,
-        damping: 15,
-      });
-      scheduleOnRN(impactAsync, ImpactFeedbackStyle.Medium);
-    })
-    .onUpdate((event) => {
-      const tabWidth = (width - 4) / tabsCount;
-      const rawIndex = Math.floor(event.x / tabWidth);
-      const newIndex = Math.max(0, Math.min(tabsCount - 1, rawIndex));
+        .onStart(() => {
+          isDragging.value = true;
+          dragStartIndex.current = currentIndex;
+          if (disableScaleEffect) return;
+          activeScale.value = withSpring<number>(1.2, {
+            stiffness: 300,
+            damping: 15,
+          });
+          scheduleOnRN(impactAsync, ImpactFeedbackStyle.Medium);
+        })
+        .onUpdate((event) => {
+          const tabWidth = (width - 4) / tabsCount;
+          const rawIndex = Math.floor(event.x / tabWidth);
+          const newIndex = Math.max(0, Math.min(tabsCount - 1, rawIndex));
 
-      if (newIndex !== currentIndex && newIndex >= 0 && newIndex < tabsCount) {
-        scheduleOnRN(onChange, newIndex);
-        scheduleOnRN(impactAsync, ImpactFeedbackStyle.Rigid);
-      }
-    })
-    .onEnd(() => {
-      isDragging.value = false;
-      activeScale.value = withSpring<number>(1, {
-        stiffness: 200,
-        damping: 20,
-      });
-      if (currentIndex !== dragStartIndex.current) {
-        scheduleOnRN(triggerBlur);
-        scheduleOnRN(impactAsync, ImpactFeedbackStyle.Medium);
-      }
-    })
-    .onFinalize(() => {
-      isDragging.value = false;
-      activeScale.value = withSpring(1, { stiffness: 200, damping: 20 });
-    });
+          if (newIndex !== currentIndex && newIndex >= 0 && newIndex < tabsCount) {
+            scheduleOnRN(onChange, newIndex);
+            scheduleOnRN(impactAsync, ImpactFeedbackStyle.Rigid);
+          }
+        })
+        .onEnd(() => {
+          isDragging.value = false;
+          activeScale.value = withSpring<number>(1, {
+            stiffness: 200,
+            damping: 20,
+          });
+          if (currentIndex !== dragStartIndex.current) {
+            scheduleOnRN(triggerBlur);
+            scheduleOnRN(impactAsync, ImpactFeedbackStyle.Medium);
+          }
+        })
+        .onFinalize(() => {
+          isDragging.value = false;
+          activeScale.value = withSpring(1, { stiffness: 200, damping: 20 });
+        }),
+    // The gesture is rebuilt only when the values it closes over change.
+    [onChange, triggerBlur, disableScaleEffect, currentIndex, tabsCount],
+  );
 
   return (
     <GestureDetector gesture={panGesture}>

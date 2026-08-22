@@ -8,7 +8,7 @@ import { DEV_USERS, useAuth } from '@/auth/AuthContext';
 import { Avatar } from '@/components/fin/primitives';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
-import { font, screenPad, space } from '@/design/tokens';
+import { font, icon, screenPad, space } from '@/design/tokens';
 
 // Sign-in (spec UI §38): "Your money, one conversation away." Live login
 // is Privy email OTP — the code arrives by mail, the server binds the
@@ -107,7 +107,7 @@ export function SignInScreen() {
               onPress={startEmail}
               accessibilityRole="button"
               style={({ pressed }) => [styles.privyBtn, { backgroundColor: colors.accent }, pressed && { opacity: 0.8 }]}>
-              <Ionicons name="mail-outline" size={17} color={colors.onAccent} />
+              <Ionicons name="mail-outline" size={icon.meta} color={colors.onAccent} />
               <AppText variant="cardTitle" tone={colors.onAccent}>
                 Continue with email
               </AppText>
