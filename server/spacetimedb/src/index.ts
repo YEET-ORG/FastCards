@@ -787,9 +787,16 @@ export const acceptInvite = spacetimedb.reducer(
 
 // ---------------------------------------------------------------- auth
 
+/** `displayName` is the name the person typed at registration. Empty string
+ * means "keep the seeded name" — the module has no optional reducer args, and
+ * an empty name must never overwrite a real one. It is only accepted here, on
+ * the bind, because that is the one moment the account has no owner yet: a
+ * rename reducer callable at any time would let a request header rename a
+ * bound user. The linked member row is renamed in the same transaction so the
+ * household surfaces cannot disagree with the session. */
 export const bindPrivyDid = spacetimedb.reducer(
-  { userId: t.string(), did: t.string() },
-  (ctx, { userId, did }) => {
+  { userId: t.string(), did: t.string(), displayName: t.string() },
+  (ctx, { userId, did, displayName }) => {
     assertGateway(ctx);
     for (const u of [...ctx.db.users.iter()]) {
       if (u.privyDid === did) err('action_conflict', 'This identity is already bound.');
@@ -797,12 +804,18 @@ export const bindPrivyDid = spacetimedb.reducer(
     const user = ctx.db.users.id.find(userId);
     if (!user) err('not_found', 'User not found.');
     if (user.privyDid) err('action_conflict', 'User already bound to an identity.');
-    ctx.db.users.id.update({ ...user, privyDid: did });
+
+    const name = displayName.trim();
+    ctx.db.users.id.update({ ...user, privyDid: did, name: name || user.name });
+    if (name) {
+      const member = ctx.db.members.id.find(user.memberId);
+      if (member) ctx.db.members.id.update({ ...member, name });
+    }
     audit(ctx, {
       kind: 'security_event',
       title: 'Owner account linked to Privy',
-      subtitle: did,
-      actor: user.name,
+      subtitle: name ? `${name} · ${did}` : did,
+      actor: name || user.name,
     });
   },
 );

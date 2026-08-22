@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { runOnJS } from 'react-native-reanimated';
 
 import { api, ApiError, type Receipt, type ServerPreparedAction } from '@/api/client';
 import {
@@ -13,6 +15,7 @@ import {
   UserBubble,
 } from '@/components/ask/blocks';
 import { Composer } from '@/components/ask/Composer';
+import { HomeAiSwitch } from '@/components/fin/HomeAiSwitch';
 import { ScreenHeader } from '@/components/fin/Screen';
 import { useToast } from '@/components/fin/Toast';
 import { AppText } from '@/design/AppText';
@@ -38,6 +41,7 @@ const nextId = () => `msg-${++itemSeq}`;
 
 export default function ChatScreen() {
   const params = useLocalSearchParams<{ q?: string; member?: string }>();
+  const router = useRouter();
   const { headers } = useAuth();
   const { state, refresh } = useDomain();
   const toast = useToast();
@@ -50,6 +54,27 @@ export default function ChatScreen() {
     typeof params.member === 'string' && params.member.length > 0 ? params.member : undefined,
   );
   const processedInitial = useRef(false);
+
+  // Swipe left anywhere on the chat to return Home: dismiss the keyboard if
+  // it is up, then pop every screen above the tabs — the same destination
+  // the Home/AI pill uses, so chat entered from a transaction or member
+  // screen still lands on Home.
+  const goHome = useCallback(() => {
+    Keyboard.dismiss();
+    router.dismissTo('/(tabs)');
+  }, [router]);
+
+  const swipeHome = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-90, 999999])
+        .failOffsetY([-10, 10])
+        .onEnd((e) => {
+          'worklet';
+          if (e.translationX <= -90) runOnJS(goHome)();
+        }),
+    [goHome],
+  );
 
   const contextMember = contextMemberId
     ? state.members.find((m) => m.id === contextMemberId)
@@ -117,9 +142,17 @@ export default function ChatScreen() {
     setItems((prev) => prev.map((i) => (i.id === id && i.role === 'proposal' ? { ...i, status } : i)));
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.bg, paddingTop: insets.top + space.s }]}>
+    <GestureDetector gesture={swipeHome}>
+      <View style={[styles.root, { backgroundColor: colors.bg, paddingTop: insets.top + space.s }]}>
       <View style={{ paddingHorizontal: screenPad }}>
-        <ScreenHeader title="Ask" back />
+        <View style={styles.headerWrap}>
+          <ScreenHeader title="Ask" />
+          {/* The Home ↔ AI switch floats centred over the header row, the same
+              placement it has on Home between the avatar and the bell. */}
+          <View pointerEvents="box-none" style={styles.headerToggle}>
+            <HomeAiSwitch mode="ai" />
+          </View>
+        </View>
         {contextMember ? (
           <View style={styles.contextRow}>
             <View style={[styles.contextChip, { backgroundColor: colors.cream, borderColor: colors.line }]}>
@@ -180,16 +213,33 @@ export default function ChatScreen() {
         </ScrollView>
 
         <View style={[styles.composerWrap, { paddingBottom: insets.bottom + space.m, backgroundColor: colors.bg }]}>
-          <Composer onSubmit={(t) => void submit(t)} autoFocus={items.length === 0} />
+          {/* Visible but never auto-focused: the keyboard opens only when the
+              user taps the field. */}
+          <Composer onSubmit={(t) => void submit(t)} />
         </View>
       </KeyboardAvoidingView>
-    </View>
+      </View>
+    </GestureDetector>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  headerWrap: {
+    position: 'relative',
+  },
+  headerToggle: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    // ScreenHeader owns a 4pt bottom margin; stop the overlay short of it
+    // so the toggle centres on the header row itself.
+    bottom: space.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   contextRow: {
     flexDirection: 'row',

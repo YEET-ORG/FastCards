@@ -18,11 +18,12 @@ import { font, screenPad, space } from '@/design/tokens';
 type Step = 'idle' | 'email' | 'code';
 
 export function SignInScreen() {
-  const { signInDev, privyError, retryPrivy } = useAuth();
+  const { signInDev, privyError, retryPrivy, setSignUpName } = useAuth();
   const insets = useSafeAreaInsets();
   const colors = useColors();
 
   const [step, setStep] = useState<Step>('idle');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -41,6 +42,10 @@ export function SignInScreen() {
   };
 
   const submitEmail = async () => {
+    if (!name.trim()) {
+      setError('Enter your name.');
+      return;
+    }
     const value = email.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) {
       setError('Enter a valid email address.');
@@ -66,6 +71,10 @@ export function SignInScreen() {
     setBusy(true);
     setError(null);
     try {
+      // Handed over before the login lands, so the name is already in hand when
+      // AuthContext's Privy bridge exchanges the token for a server session —
+      // onboarding then opens on a greeting that knows who this is.
+      setSignUpName(name);
       // AuthContext picks the Privy user up and resolves the server session.
       await loginWithCode({ code: code.trim(), email: email.trim().toLowerCase() });
     } catch (e) {
@@ -130,6 +139,20 @@ export function SignInScreen() {
           <>
             <AppText variant="label">Sign in with email</AppText>
             <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Your name"
+              placeholderTextColor={colors.textTertiary}
+              autoCapitalize="words"
+              autoCorrect={false}
+              autoComplete="name"
+              textContentType="name"
+              returnKeyType="next"
+              autoFocus
+              accessibilityLabel="Your name"
+              style={[styles.input, { backgroundColor: colors.raised, borderColor: colors.line, color: colors.textPrimary, fontFamily: font.medium }]}
+            />
+            <TextInput
               value={email}
               onChangeText={setEmail}
               placeholder="you@example.com"
@@ -137,7 +160,6 @@ export function SignInScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
-              autoFocus
               accessibilityLabel="Email address"
               style={[styles.input, { backgroundColor: colors.raised, borderColor: colors.line, color: colors.textPrimary, fontFamily: font.medium }]}
             />

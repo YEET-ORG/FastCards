@@ -94,8 +94,20 @@ function resolveWelcome(normalized: string): OnboardingCommandAction | null {
   return null;
 }
 
-export function resolveOnboardingCommandInput(stage: Stage, value: string): OnboardingCommandAction {
+export interface OnboardingCommandOptions {
+  /** False for members who cannot set the household budget (a teen signing in
+   * on the demo build). The budget stage is unreachable for them, so "change
+   * budget" must not resolve to an action that would only fail server-side. */
+  readonly canSetBudget?: boolean;
+}
+
+export function resolveOnboardingCommandInput(
+  stage: Stage,
+  value: string,
+  opts?: OnboardingCommandOptions,
+): OnboardingCommandAction {
   const n = normalizeCommandInput(value);
+  const canSetBudget = opts?.canSetBudget ?? true;
 
   switch (stage.kind) {
     case 'welcome':
@@ -115,7 +127,7 @@ export function resolveOnboardingCommandInput(stage: Stage, value: string): Onbo
       return { kind: 'invalid' };
     case 'review':
       if (REVIEW_START.has(n)) return { kind: 'review-start' };
-      if (REVIEW_CHANGE.has(n)) return { kind: 'review-change' };
+      if (canSetBudget && REVIEW_CHANGE.has(n)) return { kind: 'review-change' };
       return { kind: 'invalid' };
     case 'ready':
       if (READY.has(n)) return { kind: 'ready-continue' };

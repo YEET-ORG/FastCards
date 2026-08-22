@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, Platform, Pressable, StyleSheet, type TextInput, View } from 'react-native';
 import Animated, {
+  clamp,
   Extrapolation,
   interpolate,
   interpolateColor,
@@ -18,12 +19,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { useAskDockOptional } from '@/components/ask/AskDockContext';
-import { PlusMenu } from '@/components/ask/PlusMenu';
-import { useToast } from '@/components/fin/Toast';
 import { AppText } from '@/design/AppText';
 import { useReduceMotion } from '@/design/motion';
 import { useColors, useDepth, useTheme } from '@/design/theme';
-import { depth, font, icon, radius, space, spring } from '@/design/tokens';
+import { capsule, depth, font, icon, radius, space, spring } from '@/design/tokens';
 import AnimatedInput from '@/shared/ui/base/animated-input-bar';
 
 const TABS: {
@@ -60,13 +59,26 @@ const RESTING_PLACEHOLDER = [PLACEHOLDERS[0]];
  */
 const NO_BLUR: [number, number, number] = [0, 0, 0];
 
-const CAPSULE_H = 60;
-const FAB_SIZE = 60;
-/** The trailing button the FAB shrinks into once the field is open. */
-const FAB_SMALL = 44;
-const FAB_INSET = 8;
-/** Width the capsule gives up to the FAB when closed: the FAB plus its gap. */
-const RESERVED = FAB_SIZE + space.m;
+// Shared with the chat/onboarding composer — see `capsule` in design/tokens.
+const CAPSULE_H = capsule.height;
+const FAB_SIZE = capsule.button;
+/**
+ * Width the capsule permanently gives up to the FAB: the FAB plus its gap.
+ * Reserved in every state, so the button is never overlapped and the field
+ * ends exactly where the tabs ended.
+ */
+const RESERVED = FAB_SIZE + capsule.gap;
+
+/**
+ * The `+`/`✕` mark is drawn from two bars rather than set as an icon glyph.
+ * Ionicons pads its ink well inside the em box — `add` at 30 renders only
+ * ~19pt of actual stroke — and that ink is not centred on the em box either,
+ * so a rotated glyph lands both too small and off-centre. Two bars give exact
+ * length, weight and centre, which is what a 45° rotation needs to read as a
+ * clean `✕`.
+ */
+const MARK_LEN = 22;
+const MARK_THICK = 2.75;
 /**
  * Focus lands at roughly two thirds of the morph, so the keyboard slide
  * overlaps the tail of the spring and the whole gesture reads as one motion.
@@ -128,29 +140,35 @@ export function TabBarSpacer({
 }
 
 /**
- * A floating capsule of destinations that *becomes* the AI search field: the
- * `+` is not a separate composer trigger but the right-hand end of the same
- * surface, so opening Ask widens the capsule over the gap the FAB occupied
- * while the FAB shrinks in place into the field's trailing button. There is
- * deliberately only one input path — no second composer is summoned, and the
- * keyboard is raised part-way through the morph rather than on the tap.
+ * A floating capsule of destinations that *becomes* the AI search field,
+ * beside a detached round button that never moves.
+ *
+ * The capsule's footprint is fixed — it always stops `RESERVED` short of the
+ * right edge — so opening Ask changes nothing about the geometry: the tabs
+ * fade out and the field fades in inside the same surface, and the FAB stays
+ * a 60pt circle at the same coordinates, only re-colouring and rotating its
+ * `+` 45° into a `✕`. Nothing travels or resizes, which is what keeps the two
+ * pieces reading as one floating unit. There is deliberately only one input
+ * path — no second composer is summoned, and the keyboard is raised part-way
+ * through the morph rather than on the tap.
  */
 export function HouseholdTabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const reduceMotion = useReduceMotion();
   const router = useRouter();
-  const toast = useToast();
   const dock = useAskDockOptional();
   const barHeight = useTabBarHeight();
+  // Same elevation, two shapes: the capsule is a rounded rect and keeps the
+  // lit top edge, the button is a circle and cannot (see `orb` in tokens).
   const capsuleShade = useDepth('raise3');
+  const fabShade = useDepth('orb');
 
   const composerOpen = dock?.composerOpen ?? false;
   const vaultOpen = dock?.vaultOpen ?? false;
   const open = composerOpen && !vaultOpen;
 
   const [text, setText] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
 
   // Keyed on the two tokens they read, not the palette object.
   const placeholderStyle = useMemo(
@@ -175,7 +193,6 @@ export function HouseholdTabBar({ state, navigation }: TabBarProps) {
   const closeComposer = dock?.closeComposer;
 
   const dismiss = useCallback(() => {
-    setMenuOpen(false);
     inputRef.current?.blur();
     Keyboard.dismiss();
     closeComposer?.();
@@ -244,9 +261,6 @@ export function HouseholdTabBar({ state, navigation }: TabBarProps) {
 
   const onChangeText = useCallback((value: string) => {
     setText(value);
-    // Typing turns the trailing button into Send, so the menu it would have
-    // opened is no longer reachable — close it rather than leave it orphaned.
-    if (value.trim().length > 0) setMenuOpen(false);
   }, []);
 
   // iOS never moves the window, so the bar rides Reanimated's keyboard value
@@ -268,58 +282,78 @@ export function HouseholdTabBar({ state, navigation }: TabBarProps) {
     return { transform: [{ translateY: -ANDROID_PAN_CLEARANCE * lifted * morph.value }] };
   });
 
-  const backdropAnim = useAnimatedStyle(() => ({ opacity: morph.value }));
+  const backdropAnim = useAnimatedStyle(() => ({ opacity: clamp(morph.value, 0, 1) }));
 
-  const groundAnim = useAnimatedStyle(() => ({ opacity: 1 - morph.value }));
+  const groundAnim = useAnimatedStyle(() => ({ opacity: clamp(1 - morph.value, 0, 1) }));
 
-  // Growing the surface rightward over the gap the FAB sat in is the whole
-  // trick: no element travels, the capsule simply annexes the FAB's space.
-  const surfaceAnim = useAnimatedStyle(() => ({
-    right: RESERVED * (1 - morph.value),
-  }));
-
+  // The surface never resizes, so the crossfade *is* the transition. The two
+  // layers overlap slightly rather than handing off hard.
   const tabsAnim = useAnimatedStyle(() => ({
-    // Held at the closed width so the tabs stay put while they fade rather
-    // than stretching with the surface.
-    width: Math.max(rowW.value - RESERVED, 0),
-    opacity: interpolate(morph.value, [0, 0.45, 1], [1, 0, 0], Extrapolation.CLAMP),
-    transform: [{ scale: 1 - 0.06 * morph.value }],
+    opacity: interpolate(morph.value, [0, 0.4], [1, 0], Extrapolation.CLAMP),
+    transform: [{ scale: 1 - 0.04 * morph.value }],
   }));
 
+  // Opacity only: `AnimatedInput` runs its own per-glyph placeholder stagger,
+  // and a translate here would fight it.
   const inputAnim = useAnimatedStyle(() => ({
-    opacity: interpolate(morph.value, [0, 0.55, 1], [0, 0, 1], Extrapolation.CLAMP),
+    opacity: interpolate(morph.value, [0.25, 0.8], [0, 1], Extrapolation.CLAMP),
   }));
 
+  // Size, radius and position are static (see `styles.fab`) — the button is
+  // the one thing on screen that is guaranteed not to move.
+  //
+  // Cancel uses `lineStrong` rather than `inset`: the button sits beside a
+  // white capsule *and* over the dimmed backdrop, and `inset` is so close to
+  // both surfaces in White (#EDEFF3) — and so close to the ground in Black
+  // (#0A0A0A on #000) — that the disc reads as a washed-out ghost either way.
   const fabAnim = useAnimatedStyle(() => {
-    const m = morph.value;
-    const size = FAB_SIZE - (FAB_SIZE - FAB_SMALL) * m;
-    const openBg = interpolateColor(sendProgress.value, [0, 1], [colors.inset, colors.accent]);
+    const openBg = interpolateColor(
+      sendProgress.value,
+      [0, 1],
+      [colors.lineStrong, colors.accent],
+    );
     return {
-      width: size,
-      height: size,
-      borderRadius: size / 2,
-      backgroundColor: interpolateColor(m, [0, 1], [colors.accent, openBg]),
+      backgroundColor: interpolateColor(morph.value, [0, 1], [colors.accent, openBg]),
+      transform: [{ scale: reduceMotion ? 1 : 1 - pressed.value * 0.03 }],
+    };
+  });
+
+  /**
+   * One mark, rotated: a `+` turned 45° *is* the `✕`, so opening reads as a
+   * true morph rather than a swap. It is deliberately not rotated further on
+   * the send transition — a `+` is 90°-symmetric, so continuing the turn would
+   * walk it back into a `+`; it shrinks out instead while the arrow scales in.
+   *
+   * Send is gated on `morph` as well as on text, because dismissing the bar
+   * keeps whatever was typed — without the gate a closed FAB would sit there
+   * with no glyph at all, the arrow being hidden and the `+` faded out.
+   */
+  const markAnim = useAnimatedStyle(() => {
+    // `spring` is underdamped, so both drivers overshoot past 1 — clamped here
+    // because a negative opacity is not a valid value to hand the view.
+    const arrow = clamp(sendProgress.value * morph.value, 0, 1);
+    return {
+      opacity: 1 - arrow,
       transform: [
-        { translateX: -FAB_INSET * m },
-        { translateY: ((FAB_SIZE - FAB_SMALL) / 2) * m },
-        { scale: reduceMotion ? 1 : 1 - pressed.value * 0.03 },
+        { rotate: `${45 * morph.value}deg` },
+        // A `✕` reads optically larger than a `+` of the same span, so it is
+        // trimmed very slightly rather than held at parity.
+        { scale: (1 - 0.08 * morph.value) * (1 - 0.3 * arrow) },
       ],
     };
   });
 
-  const bigPlusAnim = useAnimatedStyle(() => ({
-    opacity: interpolate(morph.value, [0, 0.4, 1], [1, 0, 0], Extrapolation.CLAMP),
-  }));
-
-  const smallPlusAnim = useAnimatedStyle(() => ({
-    opacity:
-      interpolate(morph.value, [0, 0.6, 1], [0, 0, 1], Extrapolation.CLAMP) *
-      (1 - sendProgress.value),
-    transform: [{ rotate: `${sendProgress.value * 90}deg` }],
+  // The bars recolour in place — no second copy to crossfade against.
+  const markInkAnim = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      morph.value,
+      [0, 1],
+      [colors.onAccent, colors.iconPrimary],
+    ),
   }));
 
   const sendAnim = useAnimatedStyle(() => ({
-    opacity: sendProgress.value * interpolate(morph.value, [0, 0.6, 1], [0, 0, 1], Extrapolation.CLAMP),
+    opacity: clamp(sendProgress.value * morph.value, 0, 1),
     transform: [{ scale: 0.7 + sendProgress.value * 0.3 }],
   }));
 
@@ -333,7 +367,8 @@ export function HouseholdTabBar({ state, navigation }: TabBarProps) {
       send();
       return;
     }
-    setMenuOpen((v) => !v);
+    Haptics.selectionAsync();
+    dismiss();
   };
 
   return (
@@ -362,60 +397,12 @@ export function HouseholdTabBar({ state, navigation }: TabBarProps) {
           style={[styles.ground, { height: barHeight, backgroundColor: colors.bg }, groundAnim]}
         />
 
-        {open && menuOpen && !hasText ? (
-          <>
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={() => setMenuOpen(false)}
-              accessibilityLabel="Dismiss menu"
-            />
-            <View style={styles.menuAnchor}>
-              <PlusMenu
-                onDismiss={() => setMenuOpen(false)}
-                items={[
-                  {
-                    key: 'voice',
-                    icon: 'mic-outline',
-                    label: 'Voice',
-                    onPress: () => toast('Voice arrives after MVP.'),
-                  },
-                  {
-                    key: 'move',
-                    icon: 'swap-horizontal-outline',
-                    label: 'Move money',
-                    onPress: () => router.push('/move-money'),
-                  },
-                  {
-                    key: 'card',
-                    icon: 'card-outline',
-                    label: 'New card',
-                    onPress: () => router.push('/order-card'),
-                  },
-                  {
-                    key: 'photo',
-                    icon: 'camera-outline',
-                    label: 'Photo',
-                    caption: 'Coming later',
-                    disabled: true,
-                    onPress: () => undefined,
-                  },
-                ]}
-              />
-            </View>
-          </>
-        ) : null}
-
         <View
           style={styles.row}
           onLayout={(e) => {
             rowW.value = e.nativeEvent.layout.width;
           }}>
-          <Animated.View
-            style={[
-              styles.surface,
-              { backgroundColor: colors.raised, boxShadow: capsuleShade },
-              surfaceAnim,
-            ]}>
+          <View style={[styles.surface, { backgroundColor: colors.raised, boxShadow: capsuleShade }]}>
             <Animated.View
               pointerEvents={open ? 'none' : 'auto'}
               accessibilityElementsHidden={open}
@@ -472,9 +459,9 @@ export function HouseholdTabBar({ state, navigation }: TabBarProps) {
                 onSubmitEditing={send}
               />
             </Animated.View>
-          </Animated.View>
+          </View>
 
-          <Animated.View style={[styles.fab, { boxShadow: capsuleShade }, fabAnim]}>
+          <Animated.View style={[styles.fab, { boxShadow: fabShade }, fabAnim]}>
             <Pressable
               onPress={onTrailingPress}
               onPressIn={() => {
@@ -485,24 +472,28 @@ export function HouseholdTabBar({ state, navigation }: TabBarProps) {
               }}
               accessibilityRole="button"
               accessibilityLabel={
-                !open ? 'Ask anything about your money' : hasText ? 'Send' : 'More actions'
+                !open
+                  ? 'Ask anything about your money'
+                  : hasText
+                    ? 'Send'
+                    : 'Close the Ask bar'
               }
               accessibilityHint={
                 !open
                   ? 'Turns the navigation bar into a search field.'
                   : hasText
                     ? 'Opens a conversation with this request.'
-                    : 'Voice, move money, new card.'
+                    : 'Dismisses the composer.'
               }
               style={StyleSheet.absoluteFill}>
-              <Animated.View style={[StyleSheet.absoluteFill, styles.fabIcon, bigPlusAnim]}>
-                <Ionicons name="add" size={30} color={colors.onAccent} />
-              </Animated.View>
-              <Animated.View style={[StyleSheet.absoluteFill, styles.fabIcon, smallPlusAnim]}>
-                <Ionicons name="add" size={22} color={colors.iconPrimary} />
+              <Animated.View style={[StyleSheet.absoluteFill, styles.fabIcon, markAnim]}>
+                <View style={styles.mark}>
+                  <Animated.View style={[styles.markBar, styles.markBarH, markInkAnim]} />
+                  <Animated.View style={[styles.markBar, styles.markBarV, markInkAnim]} />
+                </View>
               </Animated.View>
               <Animated.View style={[StyleSheet.absoluteFill, styles.fabIcon, sendAnim]}>
-                <Ionicons name="arrow-up" size={20} color={colors.onAccent} />
+                <Ionicons name="arrow-up" size={26} color={colors.onAccent} />
               </Animated.View>
             </Pressable>
           </Animated.View>
@@ -604,16 +595,14 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  menuAnchor: {
-    alignItems: 'flex-end',
-    marginBottom: 8,
-  },
   row: {
     height: CAPSULE_H,
   },
   surface: {
     position: 'absolute',
     left: 0,
+    // Fixed: the capsule always stops short of the detached button.
+    right: RESERVED,
     top: 0,
     bottom: 0,
     borderRadius: radius.pill,
@@ -622,6 +611,7 @@ const styles = StyleSheet.create({
   tabsLayer: {
     position: 'absolute',
     left: 0,
+    right: 0,
     top: 0,
     bottom: 0,
     flexDirection: 'row',
@@ -634,10 +624,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: FAB_SMALL + FAB_INSET + space.xs,
+    // Mirrors `inputWrapper`'s leading padding, so the field is optically
+    // centred inside the capsule now that no button overlaps it.
+    paddingRight: 18,
   },
   inputContainer: {
     flex: 1,
+    alignSelf: 'stretch',
     width: undefined,
     marginVertical: 0,
   },
@@ -646,7 +639,8 @@ const styles = StyleSheet.create({
     // placeholder and the typed text sit on the same baseline.
     paddingHorizontal: 18,
     paddingVertical: 0,
-    minHeight: 44,
+    // Fills the capsule's full height so a tap anywhere in the field focuses it.
+    flex: 1,
     justifyContent: 'center',
   },
   movingWell: {
@@ -667,6 +661,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -674,5 +671,28 @@ const styles = StyleSheet.create({
   fabIcon: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  mark: {
+    width: MARK_LEN,
+    height: MARK_LEN,
+  },
+  // Centred by explicit insets rather than by the parent's flex alignment, so
+  // the two bars cross exactly on the box's centre — which is the point the
+  // 45° rotation turns about.
+  markBar: {
+    position: 'absolute',
+    borderRadius: MARK_THICK / 2,
+  },
+  markBarH: {
+    width: MARK_LEN,
+    height: MARK_THICK,
+    left: 0,
+    top: (MARK_LEN - MARK_THICK) / 2,
+  },
+  markBarV: {
+    width: MARK_THICK,
+    height: MARK_LEN,
+    top: 0,
+    left: (MARK_LEN - MARK_THICK) / 2,
   },
 });

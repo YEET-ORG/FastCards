@@ -2,8 +2,11 @@
 // actions aren't due yet; every card enters with a staggered FadeInDown.
 
 import { View } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import { BalanceCard } from '@/components/fin/BalanceCard';
+import type { HeroBalance } from '@/components/fin/useHeroBalance';
 import { PrimaryButton, SecondaryButton } from '@/components/fin/Buttons';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
@@ -13,7 +16,7 @@ import { formatMoneyINR } from '@/domain/money';
 import { onboardingCopy } from './copy';
 import { onboardingMotion } from './motion';
 import type { Stage } from './types';
-import { OptionCard, ReadyCard, ReviewCard, StatusPill, WorkingPill } from './cards';
+import { OptionCard, ReviewCard, StatusPill, WorkingPill } from './cards';
 
 export type StageInlineProps = {
   readonly stage: Stage;
@@ -22,6 +25,9 @@ export type StageInlineProps = {
   readonly householdName: string;
   readonly membersCount: number;
   readonly totalAvailable: number;
+  /** The same hero Home opens with — see components/fin/useHeroBalance. */
+  readonly hero: HeroBalance;
+  readonly canSetBudget: boolean;
   readonly onComplete: () => void;
   readonly onPickOrder: () => void;
   readonly onPickInvite: () => void;
@@ -51,6 +57,8 @@ export function StageInline({
   householdName,
   membersCount,
   totalAvailable,
+  hero,
+  canSetBudget,
   onComplete,
   onPickOrder,
   onPickInvite,
@@ -158,7 +166,7 @@ export function StageInline({
           budgetAmount={stage.amount}
           householdName={householdName}
           membersCount={membersCount}
-          onChange={onReviewChange}
+          onChange={canSetBudget ? onReviewChange : undefined}
           onStart={onReviewStart}
           totalAvailable={totalAvailable}
         />
@@ -167,15 +175,24 @@ export function StageInline({
   }
 
   if (stage.kind === 'ready') {
+    // The payoff is the actual Home hero, not a rendition of it: same
+    // component, same props, same pager. The thread's horizontal padding is
+    // `screenPad`, exactly what the card's pre-layout width assumes, so it
+    // lands at Home's geometry with nothing to tune.
+    //
+    // The vertical margins are not decoration — the Skia halo is absolutely
+    // positioned and bleeds 72–120pt outside the card on every side, so the
+    // assistant line above and the button below have to stand well clear of it.
     return (
-      <Animated.View entering={FadeInDown.duration(onboardingMotion.cardEnterMs)} style={{ marginTop: space.s }}>
-        <ReadyCard
-          budgetAmount={stage.amount}
-          householdName={householdName}
-          membersCount={membersCount}
-          onContinue={onComplete}
-          totalAvailable={totalAvailable}
-        />
+      <Animated.View
+        entering={FadeInDown.duration(onboardingMotion.cardEnterMs)}
+        style={{ marginTop: space.xl, rowGap: space.xl }}>
+        <GestureDetector gesture={hero.pan}>
+          <View>
+            <BalanceCard {...hero.balanceProps} />
+          </View>
+        </GestureDetector>
+        <PrimaryButton label={onboardingCopy.readyContinueLabel} onPress={onComplete} />
       </Animated.View>
     );
   }

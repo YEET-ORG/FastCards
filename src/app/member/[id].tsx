@@ -63,7 +63,7 @@ export default function MemberDetail() {
 
   return (
     <Screen>
-      <ScreenHeader title={member.name} subtitle={member.relationship ?? member.role} back />
+      <ScreenHeader title={member.name} back />
 
       <View style={styles.hero}>
         <Avatar

@@ -17,8 +17,4 @@ export const onboardingMotion = {
   headerExitMs: 180,
   scrollToEndDelayMs: 80,
   budgetAppliedHoldMs: 700,
-  /** How long the "you're all set" payoff card is held before onboarding
-   * hands off to the app on its own. Long enough to read, short enough to
-   * feel like a handoff rather than a wait. */
-  readyHandoffHoldMs: 1600,
 } as const;

@@ -123,7 +123,7 @@ export default function OrderCardScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + space.s }]}>
       <View style={{ paddingHorizontal: screenPad }}>
-        <ScreenHeader title="Get a card" subtitle="Pay in crypto · issued after review" back />
+        <ScreenHeader title="Get a card" back />
       </View>
       <ScrollView
         contentContainerStyle={styles.scroll}

@@ -132,7 +132,16 @@ export function registerRoutes(
   });
 
   const session = (req: FastifyRequest) =>
-    resolveSession(stdb, auth, req.headers as { authorization?: string; 'x-user-id'?: string });
+    resolveSession(
+      stdb,
+      auth,
+      req.headers as {
+        authorization?: string;
+        'x-user-id'?: string;
+        'privy-id-token'?: string;
+        'x-display-name'?: string;
+      },
+    );
   const assertion = (req: FastifyRequest) => req.headers['x-auth-assertion'] as string | undefined;
 
   app.get('/health', async () => ({ ok: true, provider: provider.name, auth: auth.verifier ? 'privy' : 'dev' }));

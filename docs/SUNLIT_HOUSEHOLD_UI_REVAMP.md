@@ -705,7 +705,10 @@ Expo’s `useFonts` from either package can take a combined map; use one `useFon
 Static Google files ship at a default optical size. At 48–56pt Fraunces has high contrast and “wonk.” Compensate:
 
 - Hero: `Fraunces_600SemiBold` (not 700/900), `letterSpacing: -0.4`, `lineHeight: fontSize * 1.12`.
-- Screen title: `Fraunces_600SemiBold` 30 / tracking `-0.2`.
+- Screen title: **Jakarta, not Fraunces** — `PlusJakartaSans_700Bold` 20 / tracking `-0.2`.
+  A screen title sits inline with the back chevron and the header controls, so it is
+  chrome and belongs to the UI family; Fraunces at 30 here read as a masthead and
+  overpowered the screen. Do not "restore" the serif.
 - Do not use Fraunces below 18pt. Body, tabs, chips, facts, last-4, PAN = Jakarta.
 
 ### AppText variants
@@ -720,7 +723,7 @@ export type TextVariant =
 const variants = {
   hero:        { fontSize: 52, lineHeight: 58, fontFamily: font.displaySemibold, letterSpacing: -0.4 },
   balance:     { fontSize: 36, lineHeight: 42, fontFamily: font.displaySemibold, letterSpacing: -0.3 },
-  screenTitle: { fontSize: 30, lineHeight: 36, fontFamily: font.displaySemibold, letterSpacing: -0.2 },
+  screenTitle: { fontSize: 20, lineHeight: 26, fontFamily: font.bold, letterSpacing: -0.2 },   // Jakarta
   section:     { fontSize: 18, lineHeight: 24, fontFamily: font.displayMedium },
   cardTitle:   { fontSize: 16, lineHeight: 22, fontFamily: font.semibold },      // Jakarta
   body:        { fontSize: 15, lineHeight: 22, fontFamily: font.regular },

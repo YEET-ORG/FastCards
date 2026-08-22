@@ -10,9 +10,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { UserBubble } from '@/components/ask/blocks';
 import { Composer } from '@/components/ask/Composer';
-import { TextButton } from '@/components/fin/Buttons';
+import type { HeroBalance } from '@/components/fin/useHeroBalance';
 import { AppText } from '@/design/AppText';
-import { useReduceMotion } from '@/design/motion';
 import { useColors } from '@/design/theme';
 import { radius, screenPad, space } from '@/design/tokens';
 import { formatMoneyINR } from '@/domain/money';
@@ -37,6 +36,13 @@ type Props = {
   readonly householdName: string;
   readonly membersCount: number;
   readonly totalAvailable: number;
+  /** The hero card the flow finishes on — the same one Home opens with. */
+  readonly hero: HeroBalance;
+  /** False for a session that cannot set the household budget (a teen on the
+   * demo build). The budget step is skipped rather than offered and refused. */
+  readonly canSetBudget: boolean;
+  /** The budget already on the household, used when the budget step is skipped. */
+  readonly householdBudget: number;
   readonly onSetBudget: (amount: number) => Promise<void>;
   readonly onComplete: () => void;
 };
@@ -58,19 +64,22 @@ export function OnboardingFlow({
   householdName,
   membersCount,
   totalAvailable,
+  hero,
+  canSetBudget,
+  householdBudget,
   onSetBudget,
   onComplete,
 }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const reduceMotion = useReduceMotion();
   const { height: viewportHeight } = useWindowDimensions();
 
   const [stage, setStage] = useState<Stage>({ kind: 'welcome' });
+  const [greetId] = useState(() => makeEventId('greet'));
   const [events, setEvents] = useState<readonly ThreadEvent[]>(() => [
     {
       kind: 'assistant',
-      id: makeEventId('greet'),
+      id: greetId,
       variant: 'greet',
       text: onboardingCopy.greeting(userName),
     },
@@ -82,7 +91,6 @@ export function OnboardingFlow({
   const mountedRef = useRef(true);
   const stageRef = useRef(stage);
   const budgetAppliedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const readyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completedRef = useRef(false);
   const pushReviewRef = useRef<(amount: number) => void>(() => {});
 
@@ -90,39 +98,39 @@ export function OnboardingFlow({
     stageRef.current = stage;
   });
 
+  /** The thread is append-only, so its events are frozen at the moment they
+   * are pushed — but the opening greeting is seeded at mount, and the Gate can
+   * still resolve a better name a beat later (a Privy exchange settling). The
+   * first line of the thread is the last place that should be left calling
+   * someone by the wrong name, so it alone is rendered from the live name
+   * rather than from what was captured. */
+  function eventText(ev: ThreadEvent): string | undefined {
+    if (ev.kind !== 'assistant') return undefined;
+    return ev.id === greetId ? onboardingCopy.greeting(userName) : ev.text;
+  }
+
   useEffect(
     () => () => {
       mountedRef.current = false;
       if (budgetAppliedTimerRef.current) clearTimeout(budgetAppliedTimerRef.current);
-      if (readyTimerRef.current) clearTimeout(readyTimerRef.current);
     },
     [],
   );
 
-  /** Onboarding can finish from the hold timer, the Continue button, the
-   * typed command or Skip — whichever lands first wins, and the rest are
-   * no-ops. Completion must never run twice. */
+  /** Onboarding finishes from the Continue button on the payoff step or the
+   * typed equivalent — the same action, two ways to reach it. Nothing else
+   * ends the flow, and completion must never run twice. */
   const finish = useCallback(() => {
     if (completedRef.current) return;
     completedRef.current = true;
-    if (readyTimerRef.current) clearTimeout(readyTimerRef.current);
     onComplete();
   }, [onComplete]);
 
-  /** Enter the payoff stage, then hand off to the app on its own. Reduce
-   * motion skips the hold — there is no motion to appreciate. */
+  /** Enter the payoff stage and stop there. The handoff to the app is the
+   * user's to make: a timer that dismissed this step would drop them on Home
+   * without their ever having confirmed the flow was done. */
   function enterReady(amount: number) {
     setStage({ kind: 'ready', amount });
-    if (reduceMotion) {
-      finish();
-      return;
-    }
-    if (readyTimerRef.current) clearTimeout(readyTimerRef.current);
-    readyTimerRef.current = setTimeout(() => {
-      if (!mountedRef.current) return;
-      if (stageRef.current.kind !== 'ready') return;
-      finish();
-    }, onboardingMotion.readyHandoffHoldMs);
   }
 
   const threadStarted = events.some((ev) => ev.kind === 'user');
@@ -158,6 +166,17 @@ export function OnboardingFlow({
   }
 
   function handleExplainerContinue() {
+    // A member who cannot set the household budget never sees the budget step:
+    // offering it would only end in a permission error they cannot act on.
+    // They go straight to the summary, on the budget the household already has.
+    if (!canSetBudget) {
+      appendEvents(
+        { kind: 'user', id: makeEventId('u'), label: onboardingCopy.explainerContinueLabel },
+        { kind: 'assistant', id: makeEventId('review'), variant: 'review', text: onboardingCopy.reviewText },
+      );
+      setStage({ kind: 'review', amount: householdBudget });
+      return;
+    }
     appendEvents(
       { kind: 'user', id: makeEventId('u'), label: onboardingCopy.explainerContinueLabel },
       { kind: 'assistant', id: makeEventId('budget'), variant: 'budget', text: onboardingCopy.budgetQuestion },
@@ -168,7 +187,12 @@ export function OnboardingFlow({
   function handleExplainerBack() {
     appendEvents(
       { kind: 'user', id: makeEventId('u'), label: onboardingCopy.explainerBackLabel },
-      { kind: 'assistant', id: makeEventId('greet2'), variant: 'greet', text: onboardingCopy.welcomeAgain },
+      {
+        kind: 'assistant',
+        id: makeEventId('greet2'),
+        variant: 'greet',
+        text: onboardingCopy.welcomeAgain(userName),
+      },
     );
     setStage({ kind: 'welcome' });
   }
@@ -234,7 +258,12 @@ export function OnboardingFlow({
   function handleBudgetBack() {
     appendEvents(
       { kind: 'user', id: makeEventId('u'), label: onboardingCopy.explainerBackLabel },
-      { kind: 'assistant', id: makeEventId('greet3'), variant: 'greet', text: onboardingCopy.welcomeAgain },
+      {
+        kind: 'assistant',
+        id: makeEventId('greet3'),
+        variant: 'greet',
+        text: onboardingCopy.welcomeAgain(userName),
+      },
     );
     setStage({ kind: 'welcome' });
   }
@@ -244,7 +273,12 @@ export function OnboardingFlow({
     const amount = current.kind === 'review' ? current.amount : 0;
     appendEvents(
       { kind: 'user', id: makeEventId('u'), label: onboardingCopy.reviewStartLabel },
-      { kind: 'assistant', id: makeEventId('ready'), variant: 'ready', text: onboardingCopy.readyText },
+      {
+        kind: 'assistant',
+        id: makeEventId('ready'),
+        variant: 'ready',
+        text: onboardingCopy.readyText(userName),
+      },
     );
     enterReady(amount);
   }
@@ -262,7 +296,7 @@ export function OnboardingFlow({
     const trimmed = value.trim();
     if (!trimmed) return;
 
-    const action = resolveOnboardingCommandInput(stage, trimmed);
+    const action = resolveOnboardingCommandInput(stage, trimmed, { canSetBudget });
     setError(null);
 
     switch (action.kind) {
@@ -347,13 +381,6 @@ export function OnboardingFlow({
 
   return (
     <View style={styles.root}>
-      {/* Always reachable, and outside the scroller so it cannot scroll away:
-          onboarding gates the whole app, so a stalled step must never be a
-          dead end. Its own band, so it can never overlap the thread. */}
-      <View style={styles.skipRow}>
-        <TextButton label={onboardingCopy.skipLabel} onPress={finish} />
-      </View>
-
       <ScrollView
         ref={scrollRef}
         style={{ flex: 1 }}
@@ -387,6 +414,7 @@ export function OnboardingFlow({
           const phase = isActive ? presentation.getPhase(ev.id) : 'actions';
           const showContent = !isActive || shouldShowPresentationContent(phase);
           const showActions = isActive && shouldShowStageActions(phase, ev);
+          const text = eventText(ev);
 
           return (
             <View key={ev.id} style={styles.assistantBlock}>
@@ -394,12 +422,12 @@ export function OnboardingFlow({
                 <Animated.View entering={FadeIn.duration(onboardingMotion.threadContentFadeMs)}>
                   {isActive && phase === 'typing' && ev.variant !== 'working' ? (
                     <TypingIndicator />
-                  ) : ev.text ? (
+                  ) : text ? (
                     <AppText
                       variant="body"
                       tone={colors.textSecondary}
                       style={styles.assistantText}>
-                      {ev.text}
+                      {text}
                     </AppText>
                   ) : (
                     <TypingIndicator />
@@ -410,6 +438,8 @@ export function OnboardingFlow({
               {isActive && showContent ? (
                 <StageInline
                   busy={busy}
+                  canSetBudget={canSetBudget}
+                  hero={hero}
                   householdName={householdName}
                   membersCount={membersCount}
                   onBudgetAmount={(amount) => void handleBudgetAmount(amount)}
@@ -460,10 +490,6 @@ export function OnboardingFlow({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  skipRow: {
-    alignItems: 'flex-end',
-    paddingHorizontal: screenPad,
-  },
   thread: {
     paddingHorizontal: screenPad,
     paddingBottom: space.xl,

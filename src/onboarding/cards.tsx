@@ -26,7 +26,6 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { PrimaryButton, TextButton } from '@/components/fin/Buttons';
-import { RollingMoney } from '@/components/fin/RollingMoney';
 import { AppText } from '@/design/AppText';
 import { useReduceMotion } from '@/design/motion';
 import { useColors, useDepth } from '@/design/theme';
@@ -201,7 +200,10 @@ type ReviewCardProps = {
   readonly budgetAmount: number;
   readonly totalAvailable: number;
   readonly onStart: () => void;
-  readonly onChange: () => void;
+  /** Omitted for members who cannot change the household budget — the row is
+   * dropped rather than shown disabled, so nothing offers an authority the
+   * session does not have. */
+  readonly onChange?: () => void;
 };
 
 export function ReviewCard({
@@ -228,47 +230,7 @@ export function ReviewCard({
         <FactRow label="Total available" value={formatMoneyINR(totalAvailable)} />
       </View>
       <PrimaryButton label="Start using FastCards" onPress={onStart} />
-      <TextButton label="Change budget" onPress={onChange} />
-    </View>
-  );
-}
-
-// ── ReadyCard — the payoff: live balance + Continue ───────────────────────
-
-type ReadyCardProps = {
-  readonly householdName: string;
-  readonly membersCount: number;
-  readonly budgetAmount: number;
-  readonly totalAvailable: number;
-  readonly onContinue: () => void;
-};
-
-export function ReadyCard({
-  householdName,
-  membersCount,
-  budgetAmount,
-  totalAvailable,
-  onContinue,
-}: ReadyCardProps) {
-  const colors = useColors();
-  return (
-    <View style={[styles.toolCard, { backgroundColor: colors.raised, borderColor: colors.lineStrong }]}>
-      <View style={styles.eyebrow}>
-        <Ionicons name="checkmark-circle-outline" size={14} color={colors.mintInk} />
-        <AppText variant="label" tone={colors.mintInk}>
-          Ready
-        </AppText>
-      </View>
-      <AppText variant="section">{householdName}</AppText>
-      <View style={styles.readyAmount}>
-        <AppText variant="label">Total available</AppText>
-        <RollingMoney amount={totalAvailable} fontSize={44} />
-      </View>
-      <View style={[styles.factList, { borderTopColor: colors.line }]}>
-        <FactRow label="Members" value={membersCount === 1 ? 'Just you' : `${membersCount} members`} />
-        <FactRow label="Monthly budget" value={formatMoneyINR(budgetAmount)} />
-      </View>
-      <PrimaryButton label="Continue" onPress={onContinue} />
+      {onChange ? <TextButton label="Change budget" onPress={onChange} /> : null}
     </View>
   );
 }
@@ -450,7 +412,6 @@ const styles = StyleSheet.create({
     gap: space.m,
   },
   factValue: { flexShrink: 1, textAlign: 'right' },
-  readyAmount: { gap: 6 },
   dots: {
     flexDirection: 'row',
     alignItems: 'center',

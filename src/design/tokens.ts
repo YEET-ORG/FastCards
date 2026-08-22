@@ -285,6 +285,15 @@ export const radius = {
   pill: 999,
 } as const;
 
+/**
+ * The Ask capsule: the pill field, the detached round button beside it, and
+ * the gap between the two. Shared by the Home dock (which morphs the nav
+ * capsule into this shape) and the chat/onboarding composer, so the app's two
+ * AI inputs are the same control rather than two that merely resemble each
+ * other — and so neither can be resized without the other following.
+ */
+export const capsule = { height: 60, button: 60, gap: space.m } as const;
+
 export const font = {
   displayRegular: 'Fraunces_400Regular',
   displayMedium: 'Fraunces_500Medium',
@@ -314,8 +323,15 @@ export const duration = {
  * `raise1/2/3` ascend in elevation (rows → cards → hero/nav/FAB), `well` is
  * a recessed track (segmented control, inputs), `press` is the pushed-in
  * state. Apply with the `useDepth()` hook so the mode is picked up.
+ *
+ * `orb` is `raise3` for a *circle*. The top-edge highlight is a rounded-
+ * rectangle technique: a 1px inset offset traces a crisp lit edge along a
+ * horizontal boundary, but a circle's boundary *is* horizontal at the top, so
+ * the same offset smears into a wide white arc across the crown and the fill
+ * reads as stopping short of the edge. Invisible on a disc filled `raised`
+ * (white on white), obvious on any tinted one — so tinted circles take `orb`.
  */
-export type DepthLevel = 'raise1' | 'raise2' | 'raise3' | 'well' | 'press';
+export type DepthLevel = 'raise1' | 'raise2' | 'raise3' | 'orb' | 'well' | 'press';
 
 export const depth: Record<ThemeName, Record<DepthLevel, string>> = {
   white: {
@@ -325,6 +341,7 @@ export const depth: Record<ThemeName, Record<DepthLevel, string>> = {
       '0px 2px 4px rgba(16,24,40,0.05), 0px 10px 24px rgba(16,24,40,0.07), inset 0px 1px 0px rgba(255,255,255,1)',
     raise3:
       '0px 4px 8px rgba(16,24,40,0.06), 0px 18px 40px rgba(16,24,40,0.10), inset 0px 1px 0px rgba(255,255,255,1)',
+    orb: '0px 4px 8px rgba(16,24,40,0.06), 0px 18px 40px rgba(16,24,40,0.10)',
     well: 'inset 0px 2px 4px rgba(16,24,40,0.08), inset 0px -1px 0px rgba(255,255,255,0.8)',
     press: 'inset 0px 2px 6px rgba(16,24,40,0.12)',
   },
@@ -338,6 +355,10 @@ export const depth: Record<ThemeName, Record<DepthLevel, string>> = {
       '0px 2px 4px rgba(0,0,0,0.60), 0px 10px 24px rgba(0,0,0,0.55), inset 0px 1px 0px rgba(255,255,255,0.08)',
     raise3:
       '0px 4px 8px rgba(0,0,0,0.65), 0px 18px 40px rgba(0,0,0,0.70), inset 0px 1px 0px rgba(255,255,255,0.10)',
+    // Drops carry nothing on #000, and this is the one shape that can afford
+    // to lose the highlight: a tinted disc is already a strong fill delta
+    // against the ground, which is what separates it here.
+    orb: '0px 4px 8px rgba(0,0,0,0.65), 0px 18px 40px rgba(0,0,0,0.70)',
     well: 'inset 0px 2px 6px rgba(0,0,0,0.80), inset 0px -1px 0px rgba(255,255,255,0.05)',
     press: 'inset 0px 2px 8px rgba(0,0,0,0.85)',
   },

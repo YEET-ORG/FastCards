@@ -13,4 +13,5 @@ import {
 export default {
   userId: __t.string(),
   did: __t.string(),
+  displayName: __t.string(),
 };

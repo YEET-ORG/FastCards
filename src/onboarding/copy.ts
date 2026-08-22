@@ -4,10 +4,16 @@
 export const onboardingCopy = {
   headerTitle: 'Set up',
   headerMeta: 'getting started',
-  skipLabel: 'Skip',
 
-  greeting: (name: string) => `Hi ${name} — welcome to FastCards. What would you like to do first?`,
-  welcomeAgain: 'No problem. What would you like to do first?',
+  // The name is threaded through every place the flow speaks to the person
+  // directly, and every one of them has to survive not having it: a session
+  // can resolve without a name, and "Hi  —" is worse than no name at all.
+  greeting: (name: string) =>
+    name
+      ? `Hi ${name} — welcome to FastCards. What would you like to do first?`
+      : 'Welcome to FastCards. What would you like to do first?',
+  welcomeAgain: (name: string) =>
+    `No problem${name ? `, ${name}` : ''}. What would you like to do first?`,
 
   choiceOrderTitle: 'Order my first card',
   choiceOrderSubtitle: "Pick a design — it's ready instantly",
@@ -55,7 +61,8 @@ export const onboardingCopy = {
   reviewStartLabel: 'Start using FastCards',
   reviewChangeLabel: 'Change budget',
 
-  readyText: 'All set. Your money, one conversation away.',
+  readyText: (name: string) =>
+    `All set${name ? `, ${name}` : ''}. Your money, one conversation away.`,
   readyContinueLabel: 'Continue',
 
   invalidMessage: "Couldn't understand that. Try an option above or rephrase.",

@@ -36,7 +36,6 @@ export default function FamilyDashboard() {
     <Screen scrollToTopRef={scrollRef} onScrollDirection={dock.reportScroll}>
       <ScreenHeader
         title="Family"
-        subtitle={state.household.name}
         right={
           <HeaderIconButton
             icon="person-add-outline"

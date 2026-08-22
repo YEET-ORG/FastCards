@@ -18,7 +18,11 @@ export type TextVariant =
 const variants: Record<TextVariant, TextStyle> = {
   hero: { fontSize: 52, lineHeight: 58, fontFamily: font.displaySemibold, letterSpacing: -0.4 },
   balance: { fontSize: 36, lineHeight: 42, fontFamily: font.displaySemibold, letterSpacing: -0.3 },
-  screenTitle: { fontSize: 30, lineHeight: 36, fontFamily: font.displaySemibold, letterSpacing: -0.2 },
+  // Deliberately UI type, not display type. A screen title sits inline with the
+  // back chevron and the header controls, so it belongs to the same family as
+  // the rest of the chrome — Fraunces here read as a masthead and overpowered
+  // the screen. The display faces stay on hero/balance/section.
+  screenTitle: { fontSize: 20, lineHeight: 26, fontFamily: font.bold, letterSpacing: -0.2 },
   section: { fontSize: 18, lineHeight: 24, fontFamily: font.displayMedium },
   cardTitle: { fontSize: 16, lineHeight: 22, fontFamily: font.semibold },
   body: { fontSize: 15, lineHeight: 22, fontFamily: font.regular },

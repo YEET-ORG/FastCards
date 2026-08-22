@@ -20,39 +20,131 @@ import type {
 /** The gateway's default port — keep in step with server/src/config.ts. */
 const API_PORT = 8787;
 
-/** In dev the gateway runs on the same machine as Metro, so whatever host
- * served the bundle is also the API host. Deriving it keeps every device
- * working with no per-machine setup — the old `10.0.2.2` default only ever
- * resolves inside an emulator.
- *
- * `Constants.expoConfig.hostUri` is only populated in Expo Go, so fall back
- * to the packager's script URL, which a dev client always has. On a
- * USB-attached device that URL is `localhost:8081` (React Native sets up
- * `adb reverse` for the packager); `npm run android:reverse` tunnels the
- * API port the same way. Over Wi-Fi it carries the machine's LAN IP. */
-function packagerApiUrl(): string | undefined {
-  if (!__DEV__) return undefined;
-  const scriptUrl = (
-    NativeModules as { SourceCode?: { getConstants?: () => { scriptURL?: string } } }
-  ).SourceCode?.getConstants?.().scriptURL;
-  const host =
-    Constants.expoConfig?.hostUri?.split(':')[0] ?? scriptUrl?.match(/^https?:\/\/([^:/]+)/)?.[1];
-  return host ? `http://${host}:${API_PORT}` : undefined;
-}
-
-export const API_BASE =
-  process.env.EXPO_PUBLIC_API_URL ??
-  packagerApiUrl() ??
-  Platform.select({
-    android: `http://10.0.2.2:${API_PORT}`,
-    default: `http://localhost:${API_PORT}`,
-  })!;
-
-if (__DEV__) console.log('[api] base', API_BASE);
-
 /** Bound every request: an unroutable host otherwise sits on the OS TCP
  * timeout and the gate shows a blank loading screen for minutes. */
 const REQUEST_TIMEOUT_MS = 15_000;
+
+/** A discovery probe must not inherit the request bound — a dead candidate
+ * should be written off in seconds, not fifteen. */
+const PROBE_TIMEOUT_MS = 2_000;
+
+/** The host that served the bundle. Over Wi-Fi this is the dev machine's LAN
+ * IP; on a USB device it is `localhost`, because React Native reverses the
+ * packager port (8081) and *only* that port. */
+function packagerHost(): string | undefined {
+  const scriptUrl = (
+    NativeModules as { SourceCode?: { getConstants?: () => { scriptURL?: string } } }
+  ).SourceCode?.getConstants?.().scriptURL;
+  // `hostUri` is only populated in Expo Go; a dev client always has scriptURL.
+  return Constants.expoConfig?.hostUri?.split(':')[0] ?? scriptUrl?.match(/^https?:\/\/([^:/]+)/)?.[1];
+}
+
+/** Every address the gateway might answer on, best guess first.
+ *
+ * Dev-only: a release build has no business probing private addresses, so it
+ * must carry `EXPO_PUBLIC_API_URL` instead (handled by the caller). */
+function candidateBases(): string[] {
+  if (!__DEV__) return [];
+
+  const bases: string[] = [];
+  const add = (host: string | undefined) => {
+    if (!host) return;
+    const base = `http://${host}:${API_PORT}`;
+    if (!bases.includes(base)) bases.push(base);
+  };
+
+  add(packagerHost());
+  // Baked in by app.config.ts — the routable fallback when the packager host
+  // is `localhost` and nothing has tunnelled 8787.
+  for (const host of (Constants.expoConfig?.extra?.devLanHosts as string[] | undefined) ?? []) {
+    add(host);
+  }
+  add('localhost'); // honours an existing `adb reverse tcp:8787`
+  if (Platform.OS === 'android') add('10.0.2.2'); // emulator loopback
+  return bases;
+}
+
+let resolvedBase: string | null = null;
+let inflight: Promise<string> | null = null;
+let tried: string[] = [];
+
+async function probe(base: string): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${base}/health`, { signal: controller.signal });
+    if (!res.ok) throw new Error(`health ${res.status}`);
+    return base;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * The gateway's address, discovered once and cached.
+ *
+ * Candidates are probed in parallel against `/health` and the first responder
+ * wins — they all address the same machine, so whichever route is actually
+ * open is the right answer. Failure throws a plain `Error`, never an
+ * `ApiError`: callers branch on that to tell "unreachable" from "the server
+ * answered and said no".
+ */
+export async function apiBase(): Promise<string> {
+  if (resolvedBase) return resolvedBase;
+  // Single-flight: fetchDomainState fans out five requests at once and they
+  // must share one probe round, not race five.
+  if (!inflight) {
+    const round = resolveBase().finally(() => {
+      // Only clear our own slot: resetApiBase() may have started a newer round
+      // while this one was still settling.
+      if (inflight === round) inflight = null;
+    });
+    inflight = round;
+  }
+  return inflight;
+}
+
+async function resolveBase(): Promise<string> {
+  const override = process.env.EXPO_PUBLIC_API_URL;
+  // An explicit override is authoritative — trust it unprobed, so a gateway
+  // without /health (or behind a proxy that hides it) still works.
+  if (override) {
+    tried = [override];
+    resolvedBase = override;
+    return override;
+  }
+
+  const bases = candidateBases();
+  tried = bases;
+  if (bases.length === 0) {
+    throw new Error('Could not reach the FastCards server.');
+  }
+  try {
+    const winner = await Promise.any(bases.map(probe));
+    resolvedBase = winner;
+    if (__DEV__) console.log('[api] base', winner, '(tried', bases.join(', ') + ')');
+    return winner;
+  } catch {
+    throw new Error('Could not reach the FastCards server.');
+  }
+}
+
+/** Drop the cached address so the next request rediscovers it. Call this from
+ * any user-facing retry: the network may have changed underneath us. */
+export function resetApiBase(): void {
+  resolvedBase = null;
+  inflight = null;
+}
+
+/** The address currently in use, or null before the first successful probe. */
+export function lastResolvedBase(): string | null {
+  return resolvedBase;
+}
+
+/** The candidates the last resolution attempt considered — for dev hints. */
+export function triedBases(): string[] {
+  return tried;
+}
 
 export class ApiError extends Error {
   constructor(
@@ -71,10 +163,11 @@ async function request<T>(
   headers: AuthHeaders,
   init: { method?: string; body?: unknown; stepUp?: boolean } = {},
 ): Promise<T> {
+  const base = await apiBase();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await fetch(`${base}${path}`, {
       method: init.method ?? (init.body !== undefined ? 'POST' : 'GET'),
       headers: {
         'content-type': 'application/json',

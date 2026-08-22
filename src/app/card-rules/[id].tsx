@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
 
+import { Composer } from '@/components/ask/Composer';
 import { ConfirmSheet } from '@/components/fin/ConfirmSheet';
 import { RuleChip, SectionHeader } from '@/components/fin/primitives';
 import { Panel, Screen, ScreenHeader } from '@/components/fin/Screen';
@@ -35,7 +36,6 @@ export default function CardRules() {
 
   const [editing, setEditing] = useState<'limit' | 'threshold' | null>(null);
   const [amountText, setAmountText] = useState('');
-  const [aiText, setAiText] = useState('');
 
   const card = state.cards.find((c) => c.id === id);
   if (!card) {
@@ -58,10 +58,8 @@ export default function CardRules() {
     setEditing(kind);
   };
 
-  const askAI = () => {
-    const q = aiText.trim();
-    if (!q) return;
-    setAiText('');
+  // Composer owns the text, trims it and rejects empty, so this only routes.
+  const askAI = (q: string) => {
     router.push({ pathname: '/chat', params: { q, member: card.memberId ?? '' } });
   };
 
@@ -69,25 +67,10 @@ export default function CardRules() {
     <Screen>
       <ScreenHeader title={`${card.nickname} · Rules`} back />
 
-      {/* AI rule composer — routes to Ask; changes come back as proposals */}
-      <View style={styles.aiComposer}>
-        <Ionicons name="sparkles-outline" size={16} color={colors.mint} />
-        <TextInput
-          value={aiText}
-          onChangeText={setAiText}
-          placeholder="Describe a change… e.g. “add ₹1,000 until Sunday”"
-          placeholderTextColor={colors.textTertiary}
-          style={styles.aiInput}
-          onSubmitEditing={askAI}
-          returnKeyType="send"
-          accessibilityLabel="Describe a rule change for the assistant"
-        />
-        {aiText.trim() ? (
-          <Pressable onPress={askAI} hitSlop={8} accessibilityRole="button" accessibilityLabel="Send">
-            <Ionicons name="arrow-up-circle" size={24} color={colors.mint} />
-          </Pressable>
-        ) : null}
-      </View>
+      {/* AI rule composer — routes to Ask; changes come back as proposals.
+          The same bar as chat, onboarding and the Home dock: one control for
+          every place the app takes a request in plain language. */}
+      <Composer onSubmit={askAI} placeholder="Describe a rule change…" />
 
       {/* Spending limits */}
       <View style={{ gap: space.m }}>
@@ -265,24 +248,6 @@ export default function CardRules() {
 
 function makeStyles(colors: ColorTokens) {
   return StyleSheet.create({
-  aiComposer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.s,
-    backgroundColor: colors.raised,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.tile,
-    paddingHorizontal: space.m,
-    paddingVertical: 6,
-  },
-  aiInput: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontFamily: font.regular,
-    fontSize: 14,
-    paddingVertical: 8,
-  },
   ruleRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -84,7 +84,7 @@ export default function AdminScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + space.s }]}>
       <View style={{ paddingHorizontal: screenPad }}>
-        <ScreenHeader title="Admin console" subtitle="Card orders · KYC · pools" back />
+        <ScreenHeader title="Admin console" back />
       </View>
       <ScrollView
         contentContainerStyle={styles.scroll}

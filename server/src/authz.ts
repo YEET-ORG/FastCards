@@ -19,17 +19,43 @@ export interface AuthContext {
   devAuthAllowed: boolean;
 }
 
+/** Cap on the name a caller may claim at bind time — long enough for a real
+ * name, short enough that it cannot be used as a storage channel. */
+const MAX_DISPLAY_NAME = 60;
+
+/** `x-display-name` is URI-encoded by the app: header values must be
+ * latin-1, and names are not. A malformed value is dropped, never fatal. */
+function readDisplayName(raw: string | undefined): string {
+  if (!raw) return '';
+  try {
+    return decodeURIComponent(raw).trim().slice(0, MAX_DISPLAY_NAME);
+  } catch {
+    return '';
+  }
+}
+
 export async function resolveSession(
   stdb: Stdb,
   auth: AuthContext,
-  headers: { authorization?: string; 'x-user-id'?: string; 'privy-id-token'?: string },
+  headers: {
+    authorization?: string;
+    'x-user-id'?: string;
+    'privy-id-token'?: string;
+    'x-display-name'?: string;
+  },
 ): Promise<Session> {
   const bearer = headers.authorization?.startsWith('Bearer ')
     ? headers.authorization.slice(7)
     : undefined;
 
   if (auth.verifier && bearer) {
-    return resolvePrivySession(stdb, auth.verifier, bearer, headers['privy-id-token']);
+    return resolvePrivySession(
+      stdb,
+      auth.verifier,
+      bearer,
+      headers['privy-id-token'],
+      readDisplayName(headers['x-display-name']),
+    );
   }
   if (auth.devAuthAllowed) {
     const userId = headers['x-user-id'] ?? 'u-rohan';
@@ -45,6 +71,7 @@ async function resolvePrivySession(
   verifier: AuthVerifier,
   token: string,
   idToken?: string,
+  displayName = '',
 ): Promise<Session> {
   let did: string;
   try {
@@ -61,8 +88,10 @@ async function resolvePrivySession(
       .map(mapUser)
       .find((u) => u.role === 'owner' && u.privy_did === null);
     if (ownerUnbound) {
-      await stdb.call((r) => r.bindPrivyDid({ userId: ownerUnbound.id, did }));
-      row = { ...ownerUnbound, privy_did: did };
+      // The name is only honoured here, on the claim. An already-bound row is
+      // never renamed from a request header.
+      await stdb.call((r) => r.bindPrivyDid({ userId: ownerUnbound.id, did, displayName }));
+      row = { ...ownerUnbound, privy_did: did, name: displayName || ownerUnbound.name };
     } else {
       throw new DomainError(
         'permission_denied',

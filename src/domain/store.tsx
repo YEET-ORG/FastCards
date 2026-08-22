@@ -16,7 +16,7 @@ import React, {
 } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { api, ApiError } from '@/api/client';
+import { api, ApiError, resetApiBase, triedBases } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
 import { PrimaryButton, TextButton } from '@/components/fin/Buttons';
 import { AppText } from '@/design/AppText';
@@ -178,7 +178,17 @@ export function DomainProvider({ children }: React.PropsWithChildren) {
   );
 
   if (error) {
-    return <DomainGateError message={error} onRetry={() => void refresh()} />;
+    return (
+      <DomainGateError
+        message={error}
+        onRetry={() => {
+          // The network may have changed since the failure — rediscover the
+          // gateway rather than retrying an address we already know is dead.
+          resetApiBase();
+          void refresh();
+        }}
+      />
+    );
   }
   if (!value) {
     return <DomainGateLoading />;
@@ -226,18 +236,34 @@ function DomainGateLoading() {
 function DomainGateError({ message, onRetry }: { message: string; onRetry: () => void }) {
   const colors = useColors();
   const { signOut } = useAuth();
+  const devHint = useDevReverseHint();
   return (
     <View style={[styles.fill, { backgroundColor: colors.bg }]}>
       <AppText variant="section" style={{ textAlign: 'center' }}>
-        Can't reach the server
+        Can&apos;t reach the server
       </AppText>
       <AppText variant="secondary" tone={colors.textTertiary} style={{ textAlign: 'center' }}>
         {message}
       </AppText>
+      {devHint && (
+        <AppText variant="caption" tone={colors.textTertiary} style={{ textAlign: 'center' }}>
+          {devHint}
+        </AppText>
+      )}
       <PrimaryButton label="Retry" onPress={onRetry} style={{ minWidth: 160 }} />
       <TextButton label="Sign out" destructive onPress={signOut} />
     </View>
   );
+}
+
+/** Dev-only hint. The client probes every plausible gateway address, so if it
+ * still came up empty the addresses themselves are the useful diagnostic —
+ * either the gateway is down or the device is on another network. */
+function useDevReverseHint(): string | null {
+  if (!__DEV__) return null;
+  const hosts = triedBases().map((b) => b.replace(/^https?:\/\//, ''));
+  if (hosts.length === 0) return 'No API address configured — set EXPO_PUBLIC_API_URL.';
+  return `Tried ${hosts.join(', ')} — is the gateway up? (bun run server)`;
 }
 
 const styles = StyleSheet.create({

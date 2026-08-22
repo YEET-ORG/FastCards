@@ -1,7 +1,7 @@
-// A lean rolling number. Only the characters that actually changed animate:
-// each of those becomes a two-node column (outgoing slides out, incoming
-// slides in) driven by a single shared value on the UI thread. Everything
-// else is plain text, so a settled number is one text node per character.
+// A lean rolling number. Each character is a slot holding two text nodes — the
+// outgoing glyph and the incoming one — and a slot only animates when its own
+// character actually changes. A single shared value per slot drives both nodes
+// on the UI thread.
 //
 // This replaced a Reacticx `RollingCounter` that rendered ten stacked
 // Animated.Text plus a blur view per digit — ~60 text nodes and 6 blur views
@@ -11,16 +11,33 @@
 // rolling-counter` if it is ever wanted for something else; don't route
 // numbers back through it.
 //
+// The slot deliberately holds NO React state and NO timers. An earlier version
+// tracked `entering` / `outgoing` in state and tore them down with
+// `setTimeout(ROLL_MS + 20)`, which produced four distinct defects:
+//   · a slot could be left permanently in its animating branch, because the
+//     effect's cleanup cleared the teardown timer and the re-run then hit an
+//     early return before rescheduling it;
+//   · the shared value reset landed a frame before the state update, so the
+//     new glyph appeared instantly at full opacity and then rolled in a second
+//     time — the flicker;
+//   · the same orphaning left transparent third nodes mounted forever;
+//   · a slot changing class (digit → thousands separator) short-circuited on
+//     the incoming character and dropped the outgoing glyph unanimated.
+// All four were consequences of splitting one animation across two schedulers.
+// Everything here is driven by `progress` alone.
+//
 // Layout stability is the other half of the job:
-//   · every branch (animated / reduced-motion / masked) renders the SAME row
-//     shell at the same fixed height, so toggling the mask cannot shift a
-//     pixel;
+//   · every slot renders the SAME structure whether it is rolling or settled,
+//     so nothing reflows at either end of a roll;
+//   · the row bottom-aligns rather than baseline-aligns — every text style
+//     here shares one `lineHeight`, which makes the two identical, and unlike
+//     baseline it also works for the slot's wrapper View;
 //   · `tabular` keeps digit advance widths equal, so a same-length change
 //     reflows nothing;
 //   · the row is left-anchored, so a change in digit COUNT grows rightward
 //     into empty space instead of pushing its neighbours around.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
@@ -36,7 +53,7 @@ import { font } from './tokens';
 
 /** Fast enough to land while a surrounding spring is still settling, so the
  * roll and whatever moved around it read as a single motion. */
-const ROLL_MS = 260;
+const ROLL_MS = 220;
 const ROLL_EASING = Easing.out(Easing.cubic);
 
 const isDigit = (ch: string) => /\d/.test(ch);
@@ -118,23 +135,18 @@ export function RollingNumber({
 
   const lineHeight = Math.round(fontSize * lineHeightRatio);
 
-  // `prevLen` is only needed to spot characters that appeared because the
-  // number grew a place, so they can enter instead of popping. Each cell
-  // tracks its own previous character, so nothing else has to be remembered.
-  // On first paint prevLen equals the current length, so no cell enters — the
-  // number appears static rather than rolling up from nothing.
   const chars = useMemo(() => glyphs.split(''), [glyphs]);
-  const [seen, setSeen] = useState(glyphs);
-  const [prevLen, setPrevLen] = useState(glyphs.length);
-  if (seen !== glyphs) {
-    // React's "adjust state when props change". Deliberately not an effect:
-    // an effect would commit one frame built from the previous glyphs, which
-    // shows up as a flash of mask characters sitting in digit slots the
-    // instant the balance is unhidden. A render-phase update is discarded and
-    // re-run before anything reaches the screen.
-    setPrevLen(seen.length);
-    setSeen(glyphs);
-  }
+
+  // Revealing a masked balance, or switching currency, changes almost every
+  // glyph at once — but neither is a change in VALUE, and rolling them is what
+  // used to read as the balance "animating up from zero". Detect those and
+  // commit them without animation.
+  const presentation = `${hidden ? 1 : 0}|${prefix ?? ''}|${suffix ?? ''}`;
+  const seenPresentation = useRef(presentation);
+  const presentationChanged = seenPresentation.current !== presentation;
+  useEffect(() => {
+    seenPresentation.current = presentation;
+  });
 
   const textStyle: TextStyle = { fontSize, lineHeight, fontFamily, color: ink };
   const affixStyle: TextStyle = {
@@ -190,7 +202,7 @@ export function RollingNumber({
             // number gains or loses a place.
             key={`c-${chars.length - i}`}
             char={ch}
-            isNew={chars.length - i > prevLen}
+            animate={!presentationChanged}
             textStyle={i >= fractionFrom ? fractionStyle : textStyle}
             lineHeight={lineHeight}
             fontSize={i >= fractionFrom ? Math.round(fontSize * fractionScale) : fontSize}
@@ -206,14 +218,19 @@ export function RollingNumber({
 }
 
 /**
- * One character slot. Static until its character changes, at which point it
- * mounts a second text node for the length of one roll and drops back to a
- * single node. A slot that appeared because the number grew a place enters on
- * the same curve instead of popping in at full opacity.
+ * One character slot: a fixed-height box holding an invisible in-flow spacer
+ * that sets the column width, plus the outgoing and incoming glyphs stacked on
+ * top of it. The structure never changes, so a slot cannot reflow when it
+ * starts or stops rolling — and there is no React state or timer to fall out of
+ * sync with the animation.
+ *
+ * A slot that has just appeared (the number grew a place) does not roll. Only a
+ * slot whose character CHANGED does. That is what keeps a longer number from
+ * looking like it counted up from nothing.
  */
 function Cell({
   char,
-  isNew,
+  animate,
   textStyle,
   lineHeight,
   fontSize,
@@ -221,42 +238,40 @@ function Cell({
   tabular,
 }: {
   char: string;
-  isNew: boolean;
+  animate: boolean;
   textStyle: TextStyle;
   lineHeight: number;
   fontSize: number;
   digitWidth?: number;
   tabular: boolean;
 }) {
-  const [outgoing, setOutgoing] = useState<string | null>(null);
-  const [entering, setEntering] = useState(isNew);
-  const prev = useRef(char);
-  const entered = useRef(false);
-  const progress = useSharedValue(isNew ? 0 : 1);
+  // Both refs are maintained during render so the two text nodes always have
+  // their glyphs before the effect starts the roll — the incoming node can
+  // never be a frame behind the shared value.
+  const current = useRef(char);
+  const outgoing = useRef(char);
+  if (current.current !== char) {
+    outgoing.current = current.current;
+    current.current = char;
+  }
+
+  const progress = useSharedValue(1);
+  const mounted = useRef(false);
 
   useEffect(() => {
-    // First pass: either this slot is brand new and enters, or it was part of
-    // the seed and simply exists.
-    if (!entered.current) {
-      entered.current = true;
-      if (!isNew) return;
-      progress.value = withTiming(1, { duration: ROLL_MS, easing: ROLL_EASING });
-      const t = setTimeout(() => setEntering(false), ROLL_MS + 20);
-      return () => clearTimeout(t);
+    // The first pass is the seed: whatever the number already reads, it reads
+    // statically. Nothing rolls on mount.
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
     }
-
-    if (prev.current === char) return;
-    const from = prev.current;
-    prev.current = char;
-    setEntering(false);
-    setOutgoing(from);
+    if (!animate) {
+      progress.value = 1;
+      return;
+    }
     progress.value = 0;
     progress.value = withTiming(1, { duration: ROLL_MS, easing: ROLL_EASING });
-    // Drop the extra node once the roll is done — a settled number is exactly
-    // one text node per character.
-    const t = setTimeout(() => setOutgoing(null), ROLL_MS + 20);
-    return () => clearTimeout(t);
-  }, [char, isNew, progress]);
+  }, [char, animate, progress]);
 
   const incomingStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: (1 - progress.value) * lineHeight * 0.9 }],
@@ -265,6 +280,7 @@ function Cell({
 
   const outgoingStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -progress.value * lineHeight * 0.9 }],
+    // Settled, the outgoing node is fully transparent and costs nothing.
     opacity: 1 - progress.value,
   }));
 
@@ -279,38 +295,17 @@ function Cell({
     ...(digitWidth && isDigit(char) ? { width: digitWidth, alignItems: 'center' } : null),
   };
 
-  // Settled: one plain node. Separators only ever reach this branch once
-  // they have entered — they never roll.
-  if (!entering && (outgoing === null || !isDigit(char))) {
-    if (digitWidth && isDigit(char)) {
-      return (
-        <View style={{ width: digitWidth, alignItems: 'center' }}>
-          <AppText tabular={tabular} style={glyphStyle}>
-            {char}
-          </AppText>
-        </View>
-      );
-    }
-    return (
-      <AppText tabular={tabular} style={glyphStyle}>
-        {char}
-      </AppText>
-    );
-  }
-
   return (
     <View style={box}>
       {/* Reserves the column width without painting. */}
       <AppText tabular={tabular} style={[glyphStyle, styles.spacer]}>
         {char}
       </AppText>
-      {outgoing !== null ? (
-        <Animated.View style={[StyleSheet.absoluteFill, outgoingStyle]}>
-          <AppText tabular={tabular} style={glyphStyle}>
-            {outgoing}
-          </AppText>
-        </Animated.View>
-      ) : null}
+      <Animated.View style={[StyleSheet.absoluteFill, outgoingStyle]}>
+        <AppText tabular={tabular} style={glyphStyle}>
+          {outgoing.current}
+        </AppText>
+      </Animated.View>
       <Animated.View style={[StyleSheet.absoluteFill, incomingStyle]}>
         <AppText tabular={tabular} style={glyphStyle}>
           {char}
@@ -323,11 +318,14 @@ function Cell({
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    // Baseline, not centre. The affix and the fraction are smaller than the
-    // digits; centring them in the line box floats them off the digits'
-    // baseline, which is the single thing that makes a currency mark look
-    // stuck on rather than set.
-    alignItems: 'baseline',
+    // Bottom, not baseline. The affix and the fraction are smaller than the
+    // digits, and every text style in this file shares one `lineHeight` — so
+    // bottom alignment puts them on exactly the same baseline that `baseline`
+    // would. The difference is that a View has no text baseline: under
+    // `alignItems: 'baseline'` Yoga silently falls back to the bottom edge for
+    // the character slots, and mixing that with true baseline alignment for the
+    // affixes is what used to shift glyphs a point or two mid-roll.
+    alignItems: 'flex-end',
     // Left-anchored on purpose: when the number gains a place the row grows
     // rightward into empty space instead of shunting its neighbours.
     alignSelf: 'flex-start',

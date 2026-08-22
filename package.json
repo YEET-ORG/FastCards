@@ -15,6 +15,7 @@
     "expo-apple-authentication": "~57.0.1",
     "expo-application": "~57.0.2",
     "expo-blur": "~57.0.2",
+    "expo-camera": "~57.0.4",
     "expo-clipboard": "~57.0.1",
     "expo-constants": "~57.0.13",
     "expo-crypto": "~57.0.1",
@@ -58,15 +59,18 @@
     "typescript": "~6.0.3"
   },
   "trustedDependencies": [
-    "@shopify/react-native-skia"
+    "@shopify/react-native-skia",
+    "unrs-resolver"
   ],
   "scripts": {
     "start": "expo start",
-    "prebuild": "expo prebuild",
+    "prebuild": "expo prebuild --clean",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo run:android",
+    "android": "adb reverse tcp:8787 tcp:8787; expo run:android",
     "android:reverse": "adb reverse tcp:8787 tcp:8787",
     "ios": "expo run:ios",
+    "server": "bun run --cwd server dev",
+    "server:maincloud": "bun run --cwd server start:maincloud",
     "web": "expo start --web",
     "lint": "expo lint"
   },

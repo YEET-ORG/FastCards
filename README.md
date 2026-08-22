@@ -1,56 +1,85 @@
-# Welcome to your Expo app 👋
+# FastCards
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+AI-native family crypto neobank — Expo (React Native) app + Fastify gateway
+over SpacetimeDB. Package manager is **Bun** throughout (app, gateway,
+SpacetimeDB module). No npm/yarn.
 
-## Get started
+## Prerequisites
 
-1. Install dependencies
+- Bun ≥ 1.2
+- Android: JDK 17+, Android SDK (`ANDROID_HOME` set)
+- iOS: macOS with Xcode + CocoaPods
+- A running local SpacetimeDB for the gateway (see below)
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Install
 
 ```bash
-npm run reset-project
+bun install              # app
+bun install --cwd server # gateway
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Run the backend
 
-### Other setup steps
+The app talks to the gateway on port `8787` (repo-root `.env` /
+`server/.env`). Start the database first:
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+spacetime start          # local SpacetimeDB, listens on ws://127.0.0.1:3000
+```
 
-## Learn more
+Publish the module once per database:
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+bun run --cwd server stdb:publish:local   # database: fastcards
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Then run the gateway:
 
-## Join the community
+```bash
+bun run server           # = bun run --cwd server dev, port 8787
+```
 
-Join our community of developers creating universal apps.
+(Or `bun run server:maincloud` against the hosted SpacetimeDB.)
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Build & run the app
+
+```bash
+bun run prebuild         # = expo prebuild --clean (regenerates android/ + ios/)
+bun run android          # builds, installs on device/emulator, starts Metro
+bun run ios              # macOS only: pod install + xcodebuild + simulator
+```
+
+### Finding the gateway
+
+The app discovers the gateway itself — no tunnel setup required. On first
+request it probes `/health` in parallel across the Metro host, this machine's
+LAN IPs (baked into the manifest by `app.config.ts`), `localhost`, and the
+`10.0.2.2` emulator loopback, then caches whichever answers first. USB, Wi-Fi,
+and emulator all work unchanged, and Retry on the error screen re-runs
+discovery so a network change recovers without a restart.
+
+To pin an address instead, set `EXPO_PUBLIC_API_URL` in the root `.env`
+(e.g. `http://192.168.1.18:8787`); it is used verbatim and skips probing.
+Release builds do no discovery, so they **must** set it.
+
+`bun run android` still runs `adb reverse tcp:8787 tcp:8787` as a convenience —
+the `localhost` candidate picks the tunnel up when it's there — but nothing
+depends on it any more.
+
+Two terminals, in order:
+
+```bash
+# terminal 1 — backend
+spacetime start
+bun run server
+
+# terminal 2 — app
+bun install && bun run prebuild && bun run android
+```
+
+## Other scripts
+
+- `bun run android:reverse` — optional: tunnel the API port over USB
+- `bun run lint` — `expo lint`
+- `bun run web` — `expo start --web`
+- Server tests: `bun test --cwd server`

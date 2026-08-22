@@ -18,14 +18,25 @@ import { AppText } from '@/design/AppText';
 import { useColors, useDepth } from '@/design/theme';
 import { radius, screenPad, space } from '@/design/tokens';
 
+/**
+ * Back-button box. Smaller than the 44pt minimum target on purpose — `hitSlop`
+ * restores it — so the chevron sits tight to the title instead of floating in a
+ * box that is mostly padding.
+ */
+const BACK_SIZE = 36;
+/**
+ * Pulls the glyph's ink onto the same 20pt grid the content below aligns to,
+ * compensating for the box padding plus the Ionicons side bearing.
+ */
+const BACK_INSET = 10;
+const BACK_GAP = space.xs;
+
 export function ScreenHeader({
   title,
-  subtitle,
   back,
   right,
 }: {
   title: string;
-  subtitle?: string;
   back?: boolean;
   right?: React.ReactNode;
 }) {
@@ -37,23 +48,16 @@ export function ScreenHeader({
         {back ? (
           <Pressable
             onPress={() => router.back()}
-            hitSlop={10}
+            hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel="Back"
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}>
             <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
           </Pressable>
         ) : null}
-        <View style={{ flexShrink: 1 }}>
-          <AppText variant="screenTitle" numberOfLines={1}>
-            {title}
-          </AppText>
-          {subtitle ? (
-            <AppText variant="secondary" style={{ marginTop: 2 }}>
-              {subtitle}
-            </AppText>
-          ) : null}
-        </View>
+        <AppText variant="screenTitle" numberOfLines={1} style={{ flexShrink: 1 }}>
+          {title}
+        </AppText>
       </View>
       {right ? <View style={styles.headerRight}>{right}</View> : null}
     </View>
@@ -176,17 +180,19 @@ export function Panel({ children, style }: React.PropsWithChildren<{ style?: Vie
 }
 
 const styles = StyleSheet.create({
+  // chat.tsx floats the Home↔AI switch over the header and offsets its overlay
+  // by this exact bottom margin — keep them in step.
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 52,
+    minHeight: 44,
     marginBottom: space.xs,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.s,
+    gap: BACK_GAP,
     flexShrink: 1,
   },
   headerRight: {
@@ -195,11 +201,11 @@ const styles = StyleSheet.create({
     gap: space.m,
   },
   backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: BACK_SIZE,
+    height: BACK_SIZE,
+    borderRadius: radius.control,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: -8,
+    marginLeft: -BACK_INSET,
   },
 });

@@ -70,7 +70,7 @@ function buildNavTheme(mode: ThemeName) {
 }
 
 function Gate() {
-  const { session, restoring } = useAuth();
+  const { session, restoring, justSignedIn, clearJustSignedIn } = useAuth();
   const { colors } = useTheme();
   const [onboardingDone, setOnboardingDone] = useState<Record<string, boolean> | null>(null);
 
@@ -105,8 +105,10 @@ function Gate() {
   if (restoring) return <RestoringScreen />;
   if (!session) return <SignInScreen />;
   const done = onboardingDone?.[session.userId] ?? null;
-  if (done === null) return <RestoringScreen />;
-  if (!done) {
+  // A sign-in the user just performed always runs the flow, so there is
+  // nothing to wait for — only a restored session consults the stored flag.
+  if (!justSignedIn && done === null) return <RestoringScreen />;
+  if (justSignedIn || !done) {
     return (
       <DomainProvider>
         <OnboardingScreen
@@ -116,9 +118,12 @@ function Gate() {
             // button that silently does nothing.
             void markOnboardingComplete(session.userId)
               .catch(() => undefined)
-              .then(() =>
-                setOnboardingDone((prev) => ({ ...(prev ?? {}), [session.userId]: true })),
-              );
+              .then(() => {
+                // Both together: either alone would leave a render where the
+                // gate still points at onboarding it has already finished.
+                setOnboardingDone((prev) => ({ ...(prev ?? {}), [session.userId]: true }));
+                clearJustSignedIn();
+              });
           }}
         />
       </DomainProvider>
@@ -139,6 +144,7 @@ function Gate() {
         <Stack.Screen name="invite-member" />
         <Stack.Screen name="move-money" />
         <Stack.Screen name="order-card" />
+        <Stack.Screen name="payments" />
         <Stack.Screen name="transaction/[id]" />
       </Stack>
     </DomainProvider>

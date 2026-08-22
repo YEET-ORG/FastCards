@@ -4,14 +4,14 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { useAskDock } from '@/components/ask/AskDockContext';
 import { useAuth } from '@/auth/AuthContext';
-import { BalanceCard, type BalanceScope } from '@/components/fin/BalanceCard';
-import { useScopePager } from '@/components/fin/useScopePager';
+import { BalanceCard } from '@/components/fin/BalanceCard';
+import { useHeroBalance } from '@/components/fin/useHeroBalance';
 import { InsightCard } from '@/components/fin/InsightCard';
 import { Avatar, QuickAction, SectionHeader } from '@/components/fin/primitives';
+import { HomeAiSwitch } from '@/components/fin/HomeAiSwitch';
 import { HeaderIconButton } from '@/components/fin/Screen';
 import { TransactionRow } from '@/components/fin/TransactionRow';
 import { AppText } from '@/design/AppText';
@@ -36,8 +36,10 @@ export default function AskHome() {
   const dock = useAskDock();
   const scrollRef = useRef<ScrollView>(null);
   const { formatMoney } = useMoney();
-  const [hidden, setHidden] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
+  // Same hero the last step of onboarding shows. It stands down while the Ask
+  // composer is up so the swipe cannot fight the sheet.
+  const hero = useHeroBalance({ pagerEnabled: !dock.composerOpen });
 
   useFocusEffect(
     useCallback(() => {
@@ -80,62 +82,43 @@ export default function AskHome() {
   }, [pending.length, mayaRemaining, state.household, router, noFunding, formatMoney]);
 
   const recent = [...state.transactions].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 4);
-  const owner = state.members.find((m) => m.role === 'owner') ?? state.members[0];
-  const budgetRemaining = state.household.budgetCap - state.household.budgetSpent;
-  // The card whose credentials finish the hero: the owner's first live card,
-  // falling back to any live card so the surface is never half-drawn.
-  const primaryCard =
-    state.cards.find((c) => c.memberId === owner?.id && c.status === 'active') ??
-    state.cards.find((c) => c.status === 'active');
-  const hue = colors.member[owner?.hueId ?? 'rohan'];
+  const hue = colors.member[hero.owner?.hueId ?? 'rohan'];
 
-  // The three faces the hero card morphs between.
-  const scopes = useMemo<BalanceScope[]>(() => {
-    const secondary = `${formatMoney(budgetRemaining)} left this month`;
-    return [
-      { name: 'Personal', amount: state.balances.personal, secondary },
-      { name: 'Family', amount: state.balances.family, secondary },
-      {
-        name: 'All',
-        amount: state.balances.personal + state.balances.family,
-        secondary,
-      },
-    ];
-  }, [state.balances.personal, state.balances.family, budgetRemaining, formatMoney]);
-
-  const scopeNames = useMemo(() => scopes.map((s) => s.name), [scopes]);
   // Swiping anywhere on the page changes scope, so the gesture lives here
-  // rather than on the card. It stands down while the Ask composer is up.
-  const pager = useScopePager(scopeNames, { enabled: !dock.composerOpen });
+  // rather than on the card.
+  //
+  // There used to be a second pan here: a rightward drag of 80pt or more left
+  // Home for the AI chat, composed with the pager as `Gesture.Exclusive`. It
+  // never really worked — Exclusive gives priority to its FIRST gesture, and
+  // the pager activates at 16pt of travel against the chat swipe's 80pt, so the
+  // pager won nearly every race. It only looked plausible because a rightward
+  // drag on the first scope merely rubber-banded, which read as "nothing else
+  // could have happened". Now that paging is cyclic a rightward drag always
+  // pages, so the chat swipe could never fire at all. The header's Home/AI
+  // switch is the route to chat.
+  const rootPan = hero.pan;
 
-  const actions: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }[] = [];
-  if (pending.length > 0) actions.push({ icon: 'notifications', label: 'Review', onPress: () => router.push('/approvals') });
-  actions.push({ icon: 'people-outline', label: 'Family', onPress: () => router.push('/(tabs)/family') });
-  if (total === 0) actions.push({ icon: 'add-outline', label: 'Deposit', onPress: () => router.push('/deposit') });
-  else actions.push({ icon: 'card-outline', label: 'Cards', onPress: () => router.push('/(tabs)/cards') });
-  if (actions.length < 4 && total > 0) {
-    actions.push({ icon: 'add-outline', label: 'Deposit', onPress: () => router.push('/deposit') });
-  }
+  const actions: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }[] = [
+    { icon: 'add-outline', label: 'Deposit', onPress: () => router.push('/deposit') },
+    { icon: 'swap-horizontal-outline', label: 'Transfer', onPress: () => router.push('/move-money') },
+    { icon: 'card-outline', label: 'Payments', onPress: () => router.push('/payments') },
+  ];
 
   return (
-    <GestureDetector gesture={pager.pan}>
+    <GestureDetector gesture={rootPan}>
       <View style={[styles.root, { backgroundColor: colors.bg }]}>
-        {/* The page's blue ground. A sibling of the ScrollView, not a child of
-            its content: inside the scroll it would be clipped at the content
-            edge. `styles.root` has no `overflow`, so nothing cuts it here. */}
-        <View pointerEvents="none" style={styles.glow}>
-          <Svg width="100%" height="100%">
-            <Defs>
-              <RadialGradient id="heroGlow" cx="50%" cy="42%" rx="72%" ry="58%">
-                <Stop offset="0" stopColor={colors.accent} stopOpacity={0.20} />
-                <Stop offset="0.55" stopColor={colors.accent} stopOpacity={0.07} />
-                <Stop offset="1" stopColor={colors.accent} stopOpacity={0} />
-              </RadialGradient>
-            </Defs>
-            <Rect x="0" y="0" width="100%" height="100%" fill="url(#heroGlow)" />
-          </Svg>
-        </View>
+        {/* The page ground is flat, and deliberately so. There used to be a
+            460pt elliptical accent radial here. It had to be held very faint so
+            it would not wash out the hero card's own halo — and that faintness
+            is exactly what broke it: a gradient that changes by well under
+            1/255 per pixel cannot render as a gradient, it renders as wide
+            plateaus separated by single-level steps. Because the gradient was
+            elliptical, those steps came out as curved contour arcs across the
+            top of the screen, mirror-symmetric about the centre line.
 
+            There is no opacity that fixes it. Faint enough to leave the halo
+            alone is faint enough to band; steep enough not to band is bright
+            enough to flatten the halo. The card's halo is the page's light now. */}
         <ScrollView
           ref={scrollRef}
         contentContainerStyle={[
@@ -146,8 +129,8 @@ export default function AskHome() {
         ]}
         showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          {/* Row 1: identity and the one contextual action. Nothing centred —
-              there is no period filter in this product to put there. */}
+          {/* Row 1: identity, the Home ↔ AI switch, and the one contextual action.
+              The avatar and bell are both 36pt, so the switch sits centred. */}
           <View style={styles.headerRow}>
             <Avatar
               name={session?.name ?? '?'}
@@ -156,6 +139,7 @@ export default function AskHome() {
               textColor={hue.ink}
               onPress={() => router.push('/profile')}
             />
+            <HomeAiSwitch mode="home" />
             <View style={styles.approvalsSlot}>
               <HeaderIconButton
                 icon="notifications"
@@ -184,14 +168,7 @@ export default function AskHome() {
           </AppText>
         </View>
 
-        <BalanceCard
-          scopes={scopes}
-          index={pager.index}
-          progress={pager.progress}
-          hidden={hidden}
-          onToggleHidden={() => setHidden((h) => !h)}
-          card={primaryCard}
-        />
+        <BalanceCard {...hero.balanceProps} />
 
         {newUser ? (
           <View style={styles.quickRow}>
@@ -242,16 +219,6 @@ export default function AskHome() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  // Sized to sit behind the hero and fade out well above the floating tab
-  // bar, which paints an opaque band and would otherwise cut the glow off
-  // with a hard horizontal edge.
-  glow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 460,
-  },
   scroll: {
     paddingHorizontal: screenPad,
     gap: space.xl,
