@@ -3,7 +3,6 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAskDock } from '@/components/ask/AskDockContext';
 import { useAuth } from '@/auth/AuthContext';
@@ -37,7 +36,6 @@ export default function AskHome() {
   const { state } = useDomain();
   const { session } = useAuth();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const colors = useColors();
   const dock = useAskDock();
   const sheet = useHomeSheet();
@@ -122,7 +120,7 @@ export default function AskHome() {
           contentContainerStyle={[
             styles.scroll,
             {
-              paddingTop: insets.top + space.s,
+              paddingTop: space.s,
               paddingBottom: dock.tabBarHeight + space.l,
             },
           ]}
