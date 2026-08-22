@@ -4,7 +4,9 @@
 // using the app's accent + raised + line language.
 
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect } from 'react';
+import * as Clipboard from 'expo-clipboard';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -17,6 +19,7 @@ import Animated, {
   cancelAnimation,
   Easing,
   FadeIn,
+  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -25,12 +28,18 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { PrimaryButton, TextButton } from '@/components/fin/Buttons';
+import { api, ApiError } from '@/api/client';
+import { useAuth } from '@/auth/AuthContext';
+import { PrimaryButton, SecondaryButton, TextButton } from '@/components/fin/Buttons';
 import { AppText } from '@/design/AppText';
 import { useReduceMotion } from '@/design/motion';
-import { useColors, useDepth } from '@/design/theme';
-import { radius, space } from '@/design/tokens';
+import { useColors, useDepth, useTheme } from '@/design/theme';
+import { font, space } from '@/design/tokens';
+import { useDomain } from '@/domain/store';
 import { formatMoneyINR } from '@/domain/money';
+import QRCode from '@/shared/ui/base/qr-code';
+
+import { onboardingCopy } from './copy';
 
 // ── OptionCard ────────────────────────────────────────────────────────────
 
@@ -71,7 +80,7 @@ export function OptionCard({
         }
       : variant === 'accent'
         ? {
-            bg: colors.raised,
+            bg: colors.surfaceCard,
             border: colors.accent,
             title: colors.textPrimary,
             subtitle: colors.accentInk,
@@ -82,8 +91,8 @@ export function OptionCard({
             elevated: true,
           }
         : {
-            bg: colors.raised,
-            border: colors.line,
+            bg: colors.surfaceCard,
+            border: colors.lineStrong,
             title: colors.textPrimary,
             subtitle: colors.textSecondary,
             subtitleOpacity: 1,
@@ -140,11 +149,44 @@ type StatusPillProps = {
   readonly label: string;
   readonly meta?: string;
   readonly tone?: StatusPillTone;
+  /** Override the meta text color — the explainer pills ink their stage name
+   * in the success tone. Defaults to the tone's own meta color. */
+  readonly metaTone?: string;
+  /** Soft light-grey reflective shimmer glow around the pill edges. The
+   * explainer pills only — off by default, so status pills elsewhere keep
+   * today's quiet look. */
+  readonly glow?: boolean;
   readonly style?: StyleProp<ViewStyle>;
 };
 
-export function StatusPill({ label, meta, tone = 'neutral', style }: StatusPillProps) {
+/** One pass of the shimmer breath, ~2.4s round trip. */
+const GLOW_BREATH_MS = 1200;
+
+/** Soft, rounded, light-grey — never blue, never a rectangle. */
+function glowShadow(black: boolean): string {
+  return black
+    ? '0px 0px 10px rgba(255,255,255,0.10), 0px 0px 26px rgba(255,255,255,0.06)'
+    : '0px 0px 10px rgba(190,200,215,0.55), 0px 0px 26px rgba(190,200,215,0.32)';
+}
+
+function glowSheen(black: boolean): readonly [string, string, string] {
+  return black
+    ? (['rgba(255,255,255,0)', 'rgba(255,255,255,0.14)', 'rgba(255,255,255,0)'] as const)
+    : (['rgba(255,255,255,0)', 'rgba(255,255,255,0.65)', 'rgba(255,255,255,0)'] as const);
+}
+
+export function StatusPill({
+  label,
+  meta,
+  tone = 'neutral',
+  metaTone,
+  glow = false,
+  style,
+}: StatusPillProps) {
   const colors = useColors();
+  const { mode } = useTheme();
+  const reduceMotion = useReduceMotion();
+  const black = mode === 'black';
   const t =
     tone === 'success'
       ? { bg: colors.mintDim, border: colors.mintBorder, meta: colors.mintInk }
@@ -152,18 +194,62 @@ export function StatusPill({ label, meta, tone = 'neutral', style }: StatusPillP
         ? { bg: colors.warningDim, border: colors.warning, meta: colors.warningInk }
         : tone === 'error'
           ? { bg: colors.errorDim, border: colors.error, meta: colors.errorInk }
-          : { bg: colors.raised, border: colors.line, meta: colors.textTertiary };
+          : { bg: colors.surfaceStrong, border: colors.borderSubtle, meta: colors.textTertiary };
+
+  // The glow breathes and a faint sheen sweeps the pill — slow, organic,
+  // and completely still under reduced motion.
+  const breath = useSharedValue(reduceMotion ? 1 : 0.55);
+  const sweep = useSharedValue(-100);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    breath.value = withRepeat(
+      withSequence(withTiming(1, { duration: GLOW_BREATH_MS }), withTiming(0.55, { duration: GLOW_BREATH_MS })),
+      -1,
+      false,
+    );
+    sweep.value = withRepeat(withTiming(300, { duration: GLOW_BREATH_MS * 2 }), -1, false);
+    return () => {
+      cancelAnimation(breath);
+      cancelAnimation(sweep);
+    };
+  }, [breath, sweep, reduceMotion]);
+
+  const glowAnim = useAnimatedStyle(() => ({ opacity: breath.value }));
+  const sweepAnim = useAnimatedStyle(() => ({
+    transform: [{ translateX: `${sweep.value}%` }],
+  }));
 
   return (
-    <View style={[styles.pill, { backgroundColor: t.bg, borderColor: t.border }, style]}>
-      <AppText variant="secondary" style={styles.pillLabel} numberOfLines={1}>
-        {label}
-      </AppText>
-      {meta ? (
-        <AppText variant="label" tone={t.meta} style={styles.pillMeta} numberOfLines={1}>
-          {meta}
-        </AppText>
+    <View style={[styles.glowWrap, glow ? { marginTop: space.xs } : null]}>
+      {glow ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { borderRadius: 16, boxShadow: glowShadow(black) }, glowAnim]}
+        />
       ) : null}
+      <View style={[styles.pill, { backgroundColor: t.bg, borderColor: t.border }, glow ? { marginTop: 0 } : null, style]}>
+        <AppText variant="secondary" style={styles.pillLabel} numberOfLines={1}>
+          {label}
+        </AppText>
+        {meta ? (
+          <AppText variant="label" tone={metaTone ?? t.meta} style={styles.pillMeta} numberOfLines={1}>
+            {meta}
+          </AppText>
+        ) : null}
+        {glow ? (
+          <View pointerEvents="none" style={styles.sheenClip}>
+            <Animated.View style={[styles.sheenBand, sweepAnim]}>
+              <LinearGradient
+                colors={glowSheen(black)}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </Animated.View>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -178,7 +264,7 @@ type WorkingPillProps = {
 export function WorkingPill({ label, meta }: WorkingPillProps) {
   const colors = useColors();
   return (
-    <View style={[styles.pill, styles.working, { backgroundColor: colors.raised, borderColor: colors.line }]}>
+    <View style={[styles.pill, styles.working, { backgroundColor: colors.surfaceStrong, borderColor: colors.borderSubtle }]}>
       <ActivityIndicator size="small" color={colors.accent} />
       <AppText variant="body" style={styles.workingLabel} numberOfLines={1}>
         {label}
@@ -204,6 +290,10 @@ type ReviewCardProps = {
    * dropped rather than shown disabled, so nothing offers an authority the
    * session does not have. */
   readonly onChange?: () => void;
+  /** The review stage's CTA is the funding pair rendered below the card, so
+   * the inline start button hides there. Default true keeps it for other
+   * call sites. */
+  readonly showStart?: boolean;
 };
 
 export function ReviewCard({
@@ -213,6 +303,7 @@ export function ReviewCard({
   totalAvailable,
   onStart,
   onChange,
+  showStart = true,
 }: ReviewCardProps) {
   const colors = useColors();
   return (
@@ -223,13 +314,13 @@ export function ReviewCard({
           Your household
         </AppText>
       </View>
-      <AppText variant="section">{householdName}</AppText>
+      <AppText variant="cardTitle">{householdName}</AppText>
       <View style={[styles.factList, { borderTopColor: colors.line }]}>
         <FactRow label="Members" value={membersCount === 1 ? 'Just you' : `${membersCount} members`} />
         <FactRow label="Monthly budget" value={formatMoneyINR(budgetAmount)} />
         <FactRow label="Total available" value={formatMoneyINR(totalAvailable)} />
       </View>
-      <PrimaryButton label="Start using FastCards" onPress={onStart} />
+      {showStart ? <PrimaryButton label="Start using FastCards" onPress={onStart} /> : null}
       {onChange ? <TextButton label="Change budget" onPress={onChange} /> : null}
     </View>
   );
@@ -242,7 +333,7 @@ function FactRow({ label, value }: { label: string; value: string }) {
       <AppText variant="secondary" tone={colors.textTertiary}>
         {label}
       </AppText>
-      <AppText variant="secondary" tabular style={styles.factValue}>
+      <AppText variant="secondary" tone={colors.textPrimary} tabular style={styles.factValue}>
         {value}
       </AppText>
     </View>
@@ -264,7 +355,7 @@ export function TypingIndicator() {
     return (
       <View style={[styles.dots, { columnGap: DOT_GAP }]}>
         {[0, 1, 2].map((i) => (
-          <View key={i} style={[styles.dot, { backgroundColor: colors.textTertiary, opacity: 0.5 }]} />
+          <View key={i} style={[styles.dot, { backgroundColor: colors.textSecondary, opacity: 0.5 }]} />
         ))}
       </View>
     );
@@ -272,9 +363,9 @@ export function TypingIndicator() {
 
   return (
     <View style={[styles.dots, { columnGap: DOT_GAP }]}>
-      <Dot color={colors.textTertiary} delay={0} />
-      <Dot color={colors.textTertiary} delay={STAGGER_MS} />
-      <Dot color={colors.textTertiary} delay={STAGGER_MS * 2} />
+      <Dot color={colors.textSecondary} delay={0} />
+      <Dot color={colors.textSecondary} delay={STAGGER_MS} />
+      <Dot color={colors.textSecondary} delay={STAGGER_MS * 2} />
     </View>
   );
 }
@@ -317,24 +408,255 @@ type ScrollToBottomPillProps = {
 
 export function ScrollToBottomPill({ visible, onPress, bottomOffset }: ScrollToBottomPillProps) {
   const colors = useColors();
-  const raise1 = useDepth('raise1');
   if (!visible) return null;
   return (
     <Animated.View
-      entering={FadeIn.duration(160)}
+      entering={FadeIn.duration(200)}
+      exiting={FadeOut.duration(150)}
       pointerEvents="box-none"
       style={[styles.pillOverlay, { bottom: bottomOffset }]}>
       <Pressable
         accessibilityLabel="Scroll to latest"
         accessibilityRole="button"
         onPress={onPress}
-        style={[styles.scrollPill, { backgroundColor: colors.raised, borderColor: colors.line, boxShadow: raise1 }]}>
-        <Ionicons name="arrow-down" size={14} color={colors.textSecondary} />
-        <AppText variant="caption" tone={colors.textSecondary}>
-          Latest
-        </AppText>
+        style={({ pressed }) => [
+          styles.scrollPill,
+          {
+            backgroundColor: colors.surfaceStrong,
+            borderColor: colors.borderSubtle,
+            shadowColor: '#000',
+          },
+          pressed && { opacity: 0.8 },
+        ]}>
+        <Ionicons name="chevron-down" size={20} color={colors.textPrimary} />
       </Pressable>
     </Animated.View>
+  );
+}
+
+// ── FundingReceiveCard — the funding step's receive surface ───────────────
+//
+// The same receive flow the deposit screen/sheet uses, presented in-thread:
+// deposit intent (pool address + memo + asset + rate + note) with the same
+// QRCode component and copy-to-clipboard values. Success is detected through
+// the existing deposit sync, polled so the step returns to the card
+// automatically; a manual "Check for deposits" and a "Later" escape keep the
+// step from ever blocking onboarding.
+
+interface DepositIntent {
+  network: string;
+  address: string;
+  memo: string;
+  asset: string;
+  rateInrPerUnit: number;
+  note: string;
+}
+
+/** How often the receive card asks the gateway whether the deposit landed. */
+const DEPOSIT_POLL_MS = 5000;
+/** How long the confirmed state holds before the step returns. */
+const DEPOSIT_CONFIRMED_MS = 900;
+
+function CopyValue({ value, label }: { value: string; label: string }) {
+  const colors = useColors();
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  const onPress = useCallback(async () => {
+    await Clipboard.setStringAsync(value);
+    setCopied(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 1500);
+  }, [value]);
+
+  return (
+    <Pressable
+      onPress={() => void onPress()}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}. Double tap to copy.`}
+      style={({ pressed }) => [styles.copyValue, pressed && { opacity: 0.6 }]}>
+      <AppText variant="secondary" tabular style={styles.copyValueText}>
+        {value}
+      </AppText>
+      {copied ? (
+        <View style={styles.copiedSlot} pointerEvents="none">
+          <View style={[styles.copiedPill, { backgroundColor: colors.mintDim }]}>
+            <Ionicons name="checkmark" size={12} color={colors.mintInk} />
+            <AppText variant="caption" tone={colors.mintInk}>
+              Copied
+            </AppText>
+          </View>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+export function FundingReceiveCard({
+  onSuccess,
+  onSkip,
+}: {
+  /** Called once a deposit is confirmed (or the user confirms the manual check). */
+  onSuccess: () => void;
+  /** Escape hatch — the user can always skip and reach the card step. */
+  onSkip: () => void;
+}) {
+  const { headers } = useAuth();
+  const { refresh } = useDomain();
+  const colors = useColors();
+  const [intent, setIntent] = useState<DepositIntent | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const doneRef = useRef(false);
+
+  // Load the deposit intent once (same endpoint the deposit screen uses).
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .depositIntent(headers)
+      .then((next) => {
+        if (!cancelled) setIntent(next);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e instanceof ApiError ? e.message : 'Could not load deposit details.');
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const settle = useCallback(() => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    setConfirmed(true);
+    setTimeout(onSuccess, DEPOSIT_CONFIRMED_MS);
+  }, [onSuccess]);
+
+  const check = useCallback(async () => {
+    if (checking || doneRef.current) return;
+    setChecking(true);
+    try {
+      const res = await api.syncDeposits(headers);
+      if (res.credited > 0) {
+        await refresh();
+        settle();
+      }
+    } catch {
+      // Poll failures are silent — the manual check surfaces nothing extra.
+    } finally {
+      setChecking(false);
+    }
+  }, [checking, headers, refresh, settle]);
+
+  // Poll the gateway so a completed deposit returns to the card automatically.
+  useEffect(() => {
+    if (doneRef.current) return;
+    const timer = setInterval(() => void check(), DEPOSIT_POLL_MS);
+    return () => clearInterval(timer);
+  }, [check]);
+
+  const qrValue = intent
+    ? `web+stellar:pay?destination=${intent.address}&memo=${encodeURIComponent(intent.memo)}&memo_type=MEMO_TEXT`
+    : '';
+
+  if (confirmed) {
+    return (
+      <View style={styles.receiveCard}>
+        <View style={[styles.receiveConfirmed, { backgroundColor: colors.mintDim, borderColor: colors.mintBorder }]}>
+          <Ionicons name="checkmark-circle-outline" size={18} color={colors.mintInk} />
+          <AppText variant="body" tone={colors.mintInk} style={{ flex: 1 }}>
+            {onboardingCopy.receiveDetected}
+          </AppText>
+        </View>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.receiveCard, { rowGap: space.m }]}>
+        <AppText variant="secondary" tone={colors.textTertiary}>
+          {error}
+        </AppText>
+        <SecondaryButton
+          label="Try again"
+          onPress={() => {
+            setError(null);
+            setIntent(null);
+            void api
+              .depositIntent(headers)
+              .then(setIntent)
+              .catch((e) =>
+                setError(e instanceof ApiError ? e.message : 'Could not load deposit details.'),
+              );
+          }}
+        />
+      </View>
+    );
+  }
+
+  if (!intent) {
+    return (
+      <View style={[styles.receiveCard, styles.receiveLoading]}>
+        <ActivityIndicator size="small" color={colors.accent} />
+        <AppText variant="secondary" tone={colors.textTertiary}>
+          Loading deposit details…
+        </AppText>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.receiveCard, { backgroundColor: colors.raised, borderColor: colors.lineStrong }]}>
+      <View style={styles.eyebrow}>
+        <Ionicons name="arrow-down-outline" size={14} color={colors.accentInk} />
+        <AppText variant="label" tone={colors.accentInk}>
+          {onboardingCopy.receiveTitle}
+        </AppText>
+      </View>
+
+      <View style={styles.receiveQrWrap}>
+        <QRCode QRCodevalue={qrValue} />
+      </View>
+
+      <View style={[styles.receiveFactList, { borderTopColor: colors.line }]}>
+        <CopyValue value={intent.memo} label={`Memo ${intent.memo}`} />
+        <CopyValue value={intent.address} label={`Deposit address ${intent.address}`} />
+        <View style={styles.receiveRow}>
+          <AppText variant="secondary" tone={colors.textTertiary}>
+            Asset
+          </AppText>
+          <AppText variant="secondary" tabular>
+            {intent.asset} · Stellar {intent.network}
+          </AppText>
+        </View>
+        <View style={styles.receiveRow}>
+          <AppText variant="secondary" tone={colors.textTertiary}>
+            Rate
+          </AppText>
+          <AppText variant="secondary" tabular>
+            ₹{intent.rateInrPerUnit} per {intent.asset}
+          </AppText>
+        </View>
+      </View>
+
+      <AppText variant="secondary" tone={colors.textTertiary}>
+        {intent.note}
+      </AppText>
+
+      <SecondaryButton label={checking ? 'Checking…' : onboardingCopy.receiveCheckLabel} loading={checking} onPress={() => void check()} />
+      <TextButton label={onboardingCopy.receiveSkipLabel} tone={colors.textSecondary} onPress={onSkip} />
+    </View>
   );
 }
 
@@ -343,7 +665,9 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     minHeight: 66,
-    borderRadius: radius.tile,
+    // The AI chat card radius — onboarding cards sit in the same thread
+    // language as chat cards.
+    borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: space.l,
     paddingVertical: 14,
@@ -368,13 +692,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     minHeight: 44,
-    borderRadius: radius.pill,
+    borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 10,
     columnGap: 10,
     marginTop: space.xs,
     maxWidth: '100%',
+  },
+  // Holds the halo: hugs the pill exactly (the glow is rounded with the pill)
+  // and carries the spacing when the glow is on, since the pill's own margin
+  // would otherwise sit inside the wrapper and square off the shadow.
+  glowWrap: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+  },
+  sheenClip: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 15,
+    overflow: 'hidden',
+  },
+  sheenBand: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: '45%',
   },
   pillLabel: { flexShrink: 1 },
   pillMeta: { flexShrink: 0, letterSpacing: 1 },
@@ -391,7 +738,7 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'column',
     alignItems: 'stretch',
-    borderRadius: radius.tile,
+    borderRadius: 16,
     borderWidth: 1,
     padding: space.l,
     gap: space.m,
@@ -429,12 +776,70 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scrollPill: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  // ── FundingReceiveCard ────────────────────────────────────────────────────
+  receiveCard: {
+    width: '100%',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    padding: space.l,
+    gap: space.m,
+  },
+  receiveLoading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.m,
+    minHeight: 120,
+  },
+  receiveQrWrap: { alignItems: 'center', paddingVertical: space.xs },
+  receiveFactList: {
+    gap: 7,
+    borderTopWidth: 1,
+    borderTopColor: 'transparent',
+    paddingTop: space.m,
+  },
+  receiveRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: space.m,
+  },
+  receiveConfirmed: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: space.s,
     borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    borderRadius: 16,
+    paddingHorizontal: space.l,
+    paddingVertical: space.m,
+  },
+  copyValue: { position: 'relative' },
+  copyValueText: { fontFamily: font.medium, flexShrink: 1 },
+  copiedSlot: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+  copiedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: space.s,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
 });

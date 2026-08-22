@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
-import { useCallback } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '@/auth/AuthContext';
 import { getDrawerColors } from '@/components/chat/ConversationDrawerContent';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { AiDrawer, ChatFonts } from '@/constants/ai-ui';
 import { useColors } from '@/design/theme';
 
@@ -39,6 +40,7 @@ export function HomeDrawerContent({
   const router = useRouter();
   const { signOut } = useAuth();
   const drawerColors = getDrawerColors(colors);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
 
   const go = useCallback(
     (to: Href) => {
@@ -51,22 +53,12 @@ export function HomeDrawerContent({
   const handleRow = useCallback(
     (row: (typeof ROWS)[number]) => {
       if (row.signOut) {
-        Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Sign out',
-            style: 'destructive',
-            onPress: () => {
-              onClose();
-              signOut();
-            },
-          },
-        ]);
+        setConfirmSignOut(true);
         return;
       }
       if (row.to) go(row.to);
     },
-    [go, onClose, signOut],
+    [go],
   );
 
   const headerPadTop = Math.max(0, headerCenterY - headerRowHeight / 2);
@@ -103,6 +95,20 @@ export function HomeDrawerContent({
           </Pressable>
         ))}
       </View>
+
+      <ConfirmDialog
+        visible={confirmSignOut}
+        title="Sign out"
+        message="Are you sure you want to sign out?"
+        confirmLabel="Sign out"
+        destructive
+        onConfirm={() => {
+          setConfirmSignOut(false);
+          onClose();
+          signOut();
+        }}
+        onCancel={() => setConfirmSignOut(false)}
+      />
     </View>
   );
 }

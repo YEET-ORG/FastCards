@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { AiSpacing, ChatFonts } from '@/constants/ai-ui';
 import { useColors } from '@/design/theme';
+import { useReduceMotion } from '@/design/motion';
 
 /**
  * Empty-thread landing hero (AI_CHAT_UI_UX_SPEC §10.6). FastCards has no local
@@ -11,21 +14,35 @@ import { useColors } from '@/design/theme';
  */
 const HERO_TITLE = 'How can I help today?';
 
-export function ChatLandingHero({ visible }: { visible: boolean }) {
+export function ChatLandingHero({ visible, hidden = false }: { visible: boolean; hidden?: boolean }) {
   const colors = useColors();
+  const reduceMotion = useReduceMotion();
   const { width } = useWindowDimensions();
   const contentWidth = Math.min(width - 40, 520);
   const compact = width < 390;
   const titleSize = compact ? 31 : 34;
   const titleLineHeight = compact ? 37 : 40;
 
+  // The whole hero steps aside while the input is focused — the keyboard
+  // owns the surface, so the hero fades rather than competing with it.
+  const heroOpacity = useSharedValue(hidden ? 0 : 1);
+  useEffect(() => {
+    if (reduceMotion) {
+      heroOpacity.set(hidden ? 0 : 1);
+      return;
+    }
+    heroOpacity.set(withTiming(hidden ? 0 : 1, { duration: 160 }));
+  }, [hidden, reduceMotion, heroOpacity]);
+  const heroStyle = useAnimatedStyle(() => ({ opacity: heroOpacity.value }));
+
   return (
     <View style={styles.container} pointerEvents="none">
-      <View style={[styles.heroBlock, { maxWidth: contentWidth }]}>
+      <Animated.View
+        style={[styles.heroBlock, { maxWidth: contentWidth }, heroStyle]}
+        accessible={false}
+        accessibilityElementsHidden={!visible || hidden}>
         <View
-          style={[styles.logoDisc, { backgroundColor: colors.inset, borderColor: colors.line }]}
-          accessible={false}
-          accessibilityElementsHidden={!visible}>
+          style={[styles.logoDisc, { backgroundColor: colors.inset, borderColor: colors.line }]}>
           <Ionicons name="sparkles" size={44} color={colors.accentInk} />
         </View>
         <Text
@@ -41,7 +58,7 @@ export function ChatLandingHero({ visible }: { visible: boolean }) {
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Ask about spending, cards, family or shopping.
         </Text>
-      </View>
+      </Animated.View>
     </View>
   );
 }

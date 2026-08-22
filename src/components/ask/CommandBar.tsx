@@ -26,6 +26,7 @@ import Animated, {
   withSequence,
   withSpring,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -164,6 +165,10 @@ export interface CommandBarProps {
   trailing: CommandBarTrailing;
   /** Home turns the `+` 45° into a `✕` as the bar opens; chat keeps it upright. */
   rotateMark?: boolean;
+  /** External driver for the `+` → `✕` rotation (e.g. chat's actions menu).
+      Overrides `rotateMark` when provided — the value is the rotation
+      progress 0..1, spring-driven by the caller. */
+  markMorph?: SharedValue<number>;
   onTrailingPress: () => void;
   trailingAccessibility: { label: string; hint?: string; disabled?: boolean };
 
@@ -197,6 +202,7 @@ export function CommandBar({
   focusSignal,
   trailing,
   rotateMark = false,
+  markMorph,
   onTrailingPress,
   trailingAccessibility,
   accessory,
@@ -392,8 +398,9 @@ export function CommandBar({
     const stop = clamp(stopProgress.value * morph.value, 0, 1);
     const hidden = Math.max(arrow, stop);
     // Chat keeps a literal `+` (it opens the actions menu), so only the dock
-    // couples the rotation to the morph.
-    const turn = rotateMark ? morph.value : 0;
+    // couples the rotation to the morph. When an external `markMorph` is
+    // provided (chat's actions menu), it owns the turn instead.
+    const turn = markMorph?.value ?? (rotateMark ? morph.value : 0);
     return {
       opacity: 1 - hidden,
       transform: [

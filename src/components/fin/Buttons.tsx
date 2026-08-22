@@ -13,10 +13,36 @@ interface ButtonProps {
   style?: ViewStyle;
 }
 
-export function PrimaryButton({ label, onPress, disabled, loading, style }: ButtonProps) {
+/**
+ * Optional fill overrides — all default to the accent tokens, so existing
+ * call sites keep today's exact look. The onboarding payoff Continue opts in
+ * to the inverted pill (black on Light, white on Dark) via the theme's
+ * floatingPill tokens.
+ */
+interface PrimaryButtonProps extends ButtonProps {
+  fill?: string;
+  fillPressed?: string;
+  ink?: string;
+  pressedOpacity?: number;
+}
+
+export function PrimaryButton({
+  label,
+  onPress,
+  disabled,
+  loading,
+  style,
+  fill,
+  fillPressed,
+  ink,
+  pressedOpacity,
+}: PrimaryButtonProps) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const inactive = disabled || loading;
+  const bg = fill ?? colors.accent;
+  const bgPressed = fillPressed ?? colors.accentBright;
+  const fg = ink ?? colors.onAccent;
   return (
     <Pressable
       onPress={onPress}
@@ -26,12 +52,13 @@ export function PrimaryButton({ label, onPress, disabled, loading, style }: Butt
       style={({ pressed }) => [
         styles.base,
         styles.primary,
-        pressed && { backgroundColor: colors.accentBright },
+        { backgroundColor: bg },
+        pressed && { backgroundColor: bgPressed, ...(pressedOpacity !== undefined ? { opacity: pressedOpacity } : {}) },
         disabled && !loading && { opacity: 0.45 },
         style,
       ]}>
-      {loading ? <ActivityIndicator size="small" color={colors.onAccent} /> : null}
-      <AppText variant="cardTitle" tone={colors.onAccent} style={styles.labelText}>
+      {loading ? <ActivityIndicator size="small" color={fg} /> : null}
+      <AppText variant="cardTitle" tone={fg} style={styles.labelText}>
         {label}
       </AppText>
     </Pressable>

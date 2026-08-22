@@ -13,12 +13,12 @@ import { Composer } from '@/components/ask/Composer';
 import type { HeroBalance } from '@/components/fin/useHeroBalance';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
-import { radius, screenPad, space } from '@/design/tokens';
+import { font, screenPad, space } from '@/design/tokens';
 import { formatMoneyINR } from '@/domain/money';
 
 import { ScrollToBottomPill, TypingIndicator } from './cards';
 import { onboardingCopy } from './copy';
-import { onboardingMotion } from './motion';
+import { onboardingMessageEnter, onboardingMotion } from './motion';
 import {
   resolveOnboardingCommandInput,
   resolveOnboardingPlaceholder,
@@ -86,6 +86,9 @@ export function OnboardingFlow({
   ]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Monotonic: each bump focuses the composer — the "Custom amount" budget
+  // option hands the answer to the input instead of a preset.
+  const [composerFocusSignal, setComposerFocusSignal] = useState(0);
 
   const scrollRef = useRef<ScrollView>(null);
   const mountedRef = useRef(true);
@@ -268,11 +271,11 @@ export function OnboardingFlow({
     setStage({ kind: 'welcome' });
   }
 
-  function handleReviewStart() {
+  function handleReviewStart(label: string = onboardingCopy.reviewStartLabel) {
     const current = stageRef.current;
     const amount = current.kind === 'review' ? current.amount : 0;
     appendEvents(
-      { kind: 'user', id: makeEventId('u'), label: onboardingCopy.reviewStartLabel },
+      { kind: 'user', id: makeEventId('u'), label },
       {
         kind: 'assistant',
         id: makeEventId('ready'),
@@ -281,6 +284,14 @@ export function OnboardingFlow({
       },
     );
     enterReady(amount);
+  }
+
+  /** "Add fund now" — the user bubble enters the transcript, and the review
+   * block swaps its funding pair for the receive card. No stage change: the
+   * active assistant event stays the review message, so the block (and its
+   * receive state) stays mounted. */
+  function handleFundNow() {
+    appendEvents({ kind: 'user', id: makeEventId('u'), label: onboardingCopy.fundNowLabel });
   }
 
   function handleReviewChange() {
@@ -399,7 +410,9 @@ export function OnboardingFlow({
           <Animated.View
             entering={FadeIn.duration(onboardingMotion.headerEnterMs)}
             style={{ marginBottom: space.xl, rowGap: 2 }}>
-            <AppText variant="section">{onboardingCopy.headerTitle}</AppText>
+            <AppText variant="body" style={styles.headerTitle}>
+              {onboardingCopy.headerTitle}
+            </AppText>
             <AppText variant="label" style={{ letterSpacing: 1.2 }}>
               {onboardingCopy.headerMeta}
             </AppText>
@@ -419,13 +432,13 @@ export function OnboardingFlow({
           return (
             <View key={ev.id} style={styles.assistantBlock}>
               {showContent ? (
-                <Animated.View entering={FadeIn.duration(onboardingMotion.threadContentFadeMs)}>
+                <Animated.View entering={onboardingMessageEnter()}>
                   {isActive && phase === 'typing' && ev.variant !== 'working' ? (
                     <TypingIndicator />
                   ) : text ? (
                     <AppText
                       variant="body"
-                      tone={colors.textSecondary}
+                      tone={colors.textPrimary}
                       style={styles.assistantText}>
                       {text}
                     </AppText>
@@ -444,9 +457,11 @@ export function OnboardingFlow({
                   membersCount={membersCount}
                   onBudgetAmount={(amount) => void handleBudgetAmount(amount)}
                   onBudgetBack={handleBudgetBack}
+                  onBudgetCustom={() => setComposerFocusSignal((n) => n + 1)}
                   onComplete={finish}
                   onExplainerBack={handleExplainerBack}
                   onExplainerContinue={handleExplainerContinue}
+                  onFundNow={handleFundNow}
                   onPickInvite={() => handlePick('invite-family', onboardingCopy.choiceFamilyTitle)}
                   onPickOrder={() => handlePick('order-card', onboardingCopy.choiceOrderTitle)}
                   onPickTour={() => handlePick('tour', onboardingCopy.choiceTourTitle)}
@@ -455,6 +470,7 @@ export function OnboardingFlow({
                   showActions={showActions}
                   stage={stage}
                   totalAvailable={totalAvailable}
+                  userName={userName}
                 />
               ) : null}
             </View>
@@ -482,6 +498,8 @@ export function OnboardingFlow({
         <Composer
           onSubmit={handlePromptSend}
           placeholder={resolveOnboardingPlaceholder(stage)}
+          keyboardLift
+          focusSignal={composerFocusSignal}
         />
       </View>
     </View>
@@ -493,14 +511,20 @@ const styles = StyleSheet.create({
   thread: {
     paddingHorizontal: screenPad,
     paddingBottom: space.xl,
-    gap: space.l,
+    // The AI chat thread's message gap.
+    gap: 14,
   },
   assistantBlock: {
     gap: 10,
-    marginBottom: space.xl,
+  },
+  headerTitle: {
+    fontFamily: font.semibold,
+    fontSize: 16,
+    lineHeight: 20,
+    letterSpacing: 0.2,
   },
   assistantText: {
-    fontSize: 17,
+    fontSize: 15,
     lineHeight: 24,
     maxWidth: '92%',
   },
@@ -510,7 +534,7 @@ const styles = StyleSheet.create({
     marginBottom: space.xl,
   },
   errorChip: {
-    borderRadius: radius.control,
+    borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: space.l,
     paddingVertical: space.s,

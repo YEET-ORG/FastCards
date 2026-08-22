@@ -15,6 +15,12 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  FadeInDown,
+  FadeOutDown,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 
 import { api, ApiError, type Receipt, type ServerPreparedAction } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
@@ -32,6 +38,7 @@ import { AiSpacing, ChatFonts } from '@/constants/ai-ui';
 import { ScrollToBottomPill } from '@/components/shared/ScrollToBottomPill';
 import { useColors } from '@/design/theme';
 import { space } from '@/design/tokens';
+import { useReduceMotion } from '@/design/motion';
 import { useToast } from '@/components/fin/Toast';
 import { useDomain } from '@/domain/store';
 import { hapticSuccess, hapticTap } from '@/utils/haptics';
@@ -70,7 +77,7 @@ const SUGGESTIONS = [
  * there would be motion for its own sake. The dock, which is only open while
  * you are looking straight at it, still rotates its four.
  */
-const CHAT_PLACEHOLDER = ['Ask anything about your money…'];
+const CHAT_PLACEHOLDER = ['Ask anything'];
 
 /**
  * Gaps between the top of the command bar's footprint and each overlay that
@@ -142,6 +149,18 @@ export function ChatSurface({
   const [ctxMsg, setCtxMsg] = useState<StoredMessage | null>(null);
   const [ctxAnchor, setCtxAnchor] = useState<MessageMenuAnchor | null>(null);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
+  // Drives the composer's `+` → `✕` rotation while the actions menu is up.
+  // The mark is drawn from two bars, so a 45° turn *is* the ✕ — one value,
+  // sprung on the UI thread, owns the whole transition.
+  const markMorph = useSharedValue(0);
+  const reduceMotion = useReduceMotion();
+  useEffect(() => {
+    if (reduceMotion) {
+      markMorph.set(actionMenuOpen ? 1 : 0);
+      return;
+    }
+    markMorph.set(withSpring(actionMenuOpen ? 1 : 0, { damping: 26, mass: 0.8, stiffness: 220, overshootClamping: true }));
+  }, [actionMenuOpen, reduceMotion, markMorph]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
@@ -610,7 +629,7 @@ export function ChatSurface({
 
         {showHero ? (
           <View style={[styles.heroWrap, { paddingBottom: heroBottomInset }]} pointerEvents="box-none">
-            <ChatLandingHero visible={visible} />
+            <ChatLandingHero visible={visible} hidden={isKeyboardVisible} />
           </View>
         ) : (
           <FlatList
@@ -654,7 +673,9 @@ export function ChatSurface({
         />
 
         {actionMenuOpen ? (
-          <View
+          <Animated.View
+            entering={reduceMotion ? undefined : FadeInDown.duration(180)}
+            exiting={reduceMotion ? undefined : FadeOutDown.duration(140)}
             style={[
               styles.plusMenuWrap,
               { bottom: commandBarTop + GAP_ABOVE_BAR.plusMenu, right: space.l },
@@ -668,7 +689,7 @@ export function ChatSurface({
               ]}
               onDismiss={() => setActionMenuOpen(false)}
             />
-          </View>
+          </Animated.View>
         ) : null}
 
         {/* The same control the Home dock morphs into — not a copy of it. It
@@ -684,6 +705,7 @@ export function ChatSurface({
           inputMaxHeight={44}
           focusSignal={editFocusSignal}
           trailing={trailing}
+          markMorph={markMorph}
           onTrailingPress={handleTrailingPress}
           trailingAccessibility={trailingAccessibility}
           accessory={

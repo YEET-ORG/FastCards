@@ -13,13 +13,19 @@ import LoadingState from '@/shared/ui/ai/thinking-state';
 
 export function UserBubble({ text }: { text: string }) {
   const colors = useColors();
+  const isShort = text.trim().length < 40 && !text.includes('\n');
   return (
     <View
       style={[
         styles.userBubble,
-        { backgroundColor: colors.cream, borderColor: colors.line },
+        {
+          backgroundColor: colors.textPrimary,
+          borderRadius: isShort ? 24 : 16,
+        },
       ]}>
-      <AppText variant="body">{text}</AppText>
+      <AppText variant="body" tone={colors.textInverse} style={{ fontSize: 15, lineHeight: 22 }}>
+        {text}
+      </AppText>
     </View>
   );
 }
@@ -168,12 +174,9 @@ export function ReceiptBlock({ receipt }: { receipt: Receipt }) {
 const styles = StyleSheet.create({
   userBubble: {
     alignSelf: 'flex-end',
-    maxWidth: '82%',
-    borderWidth: 1,
-    borderRadius: 16,
-    borderBottomRightRadius: 5,
+    maxWidth: '80%',
     paddingHorizontal: space.l,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   thinking: {
     flexDirection: 'row',
