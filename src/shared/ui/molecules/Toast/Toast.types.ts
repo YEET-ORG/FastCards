@@ -20,6 +20,12 @@ export interface ToastOptions {
     label: string;
     onPress: () => void;
   } | null;
+  actions?: {
+    label: string;
+    onPress: () => void;
+  }[];
+  dismissible?: boolean;
+  topOffset?: number;
   expandedContent?:
     | React.ReactNode
     | ((props: ExpandedContentProps) => React.ReactNode);

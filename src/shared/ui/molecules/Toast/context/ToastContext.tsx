@@ -14,6 +14,9 @@ const DEFAULT_TOAST_OPTIONS: Required<ToastOptions> = {
   backgroundColor: "#262626",
   onClose: () => {},
   action: null,
+  actions: [],
+  dismissible: false,
+  topOffset: 80,
   expandedContent: null,
   style: {},
 };

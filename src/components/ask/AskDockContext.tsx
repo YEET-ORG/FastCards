@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import type { ScrollView } from 'react-native';
+import { useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 type ScrollDir = 'up' | 'down';
 
@@ -19,6 +20,14 @@ type AskDockController = {
   composerOpen: boolean;
   openComposer: () => void;
   closeComposer: () => void;
+  /** Chat-first shell mode: the dock stands down so the floating composer and
+      the history drawer own the bottom of the screen. */
+  chatMode: boolean;
+  setChatMode: (v: boolean) => void;
+  /** The drawer's single surface translate, owned here so the shell (inside
+      the navigator) and the floating nav bar (outside it) can both ride it.
+      The shell's `useChatDrawer` writes it; the nav bar reads it. */
+  surfaceX: SharedValue<number>;
 };
 
 const AskDockContext = createContext<AskDockController | null>(null);
@@ -30,7 +39,11 @@ export function AskDockProvider({ children }: React.PropsWithChildren) {
   // Overwritten on mount by `TabBarSpacer`; this only covers the first frame.
   const [tabBarHeight, setTabBarHeight] = useState(88);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [chatMode, setChatMode] = useState(false);
   const scrollFns = useRef<Record<string, () => void>>({});
+  // Single shared value — created above the navigator so both the shell and
+  // the floating nav bar can animate off it (see ChatFirstShell).
+  const surfaceX = useSharedValue(0);
 
   const openComposer = useCallback(() => setComposerOpen(true), []);
   const closeComposer = useCallback(() => setComposerOpen(false), []);
@@ -67,6 +80,9 @@ export function AskDockProvider({ children }: React.PropsWithChildren) {
       composerOpen,
       openComposer,
       closeComposer,
+      chatMode,
+      setChatMode,
+      surfaceX,
     }),
     [
       vaultOpen,
@@ -76,6 +92,9 @@ export function AskDockProvider({ children }: React.PropsWithChildren) {
       composerOpen,
       openComposer,
       closeComposer,
+      chatMode,
+      setChatMode,
+      surfaceX,
       reportScroll,
       registerScrollToTop,
       scrollToTop,

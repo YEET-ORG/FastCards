@@ -1,12 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  Pressable,
+  StyleSheet,
+  View,
+  type GestureResponderEvent,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { AppText } from '@/design/AppText';
 import { useReduceMotion } from '@/design/motion';
 import { useColors, useTheme } from '@/design/theme';
 import { depth, radius, space, type DepthLevel } from '@/design/tokens';
+import type { MorphOrigin } from '@/features/home-sheets/sheetMotion';
 import { Avatar as ReacticxAvatar } from '@/shared/ui/base/avatar';
 import Badge from '@/shared/ui/base/badge';
 import { AnimatedProgressBar } from '@/shared/ui/organisms/progress';
@@ -202,6 +210,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 export function PressableSurface({
   level = 'raise2',
   onPress,
+  onPressIn,
   disabled,
   style,
   children,
@@ -209,6 +218,8 @@ export function PressableSurface({
 }: {
   level?: Exclude<DepthLevel, 'press' | 'well'>;
   onPress?: () => void;
+  /** Chained AFTER the surface's own press-in scale, so callers can measure. */
+  onPressIn?: (event: GestureResponderEvent) => void;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
@@ -234,9 +245,10 @@ export function PressableSurface({
     <AnimatedPressable
       onPress={onPress}
       disabled={disabled}
-      onPressIn={() => {
+      onPressIn={(event) => {
         setIsDown(true);
         pressed.value = withTiming(1, { duration: 100 });
+        onPressIn?.(event);
       }}
       onPressOut={() => {
         setIsDown(false);
@@ -256,14 +268,44 @@ export function QuickAction({
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
-  onPress?: () => void;
+  /**
+   * The sheet a quick action opens expands out of the button's own rect, so
+   * the button measures itself at touch-down and hands the frame — plus the
+   * window Y of the touch — over with the press. `measureInWindow` answers on
+   * a later tick; the gap between touch-down and the finger lifting is long
+   * enough that the rect is already there by the time `onPress` needs it. A
+   * tap fast enough to beat it just gets `undefined` and the sheet's older
+   * bottom-up rise — a graceful downgrade, never a broken animation.
+   */
+  onPress?: (originY?: number, rect?: MorphOrigin) => void;
 }) {
   const colors = useColors();
+  const wrapperRef = useRef<View>(null);
+  const rectRef = useRef<MorphOrigin | null>(null);
+  const touchY = useRef<number | undefined>(undefined);
+
+  // Cleared first: a stale rect from an earlier press would point at wherever
+  // that row used to be.
+  const handlePressIn = () => {
+    rectRef.current = null;
+    wrapperRef.current?.measureInWindow((x, y, width, height) => {
+      rectRef.current = { x, y, width, height };
+    });
+  };
+
+  const handlePress = () => {
+    onPress?.(touchY.current, rectRef.current ?? undefined);
+  };
+
   return (
-    <View style={styles.quickAction}>
+    <View ref={wrapperRef} style={styles.quickAction}>
       <PressableSurface
         level="raise2"
-        onPress={onPress}
+        onPress={handlePress}
+        onPressIn={(event) => {
+          touchY.current = event.nativeEvent.pageY;
+          handlePressIn();
+        }}
         accessibilityRole="button"
         accessibilityLabel={label}
         style={[styles.quickActionIcon, { backgroundColor: colors.raised }]}>

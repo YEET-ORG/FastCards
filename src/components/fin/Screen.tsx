@@ -69,13 +69,35 @@ export function HeaderIconButton({
   label,
   onPress,
   size = 44,
+  bare = false,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   onPress?: () => void;
   size?: number;
+  bare?: boolean;
 }) {
   const colors = useColors();
+  if (bare) {
+    return (
+      <Pressable
+        onPress={onPress}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        style={({ pressed }) => [
+          {
+            width: size,
+            height: size,
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+          pressed && { opacity: 0.65 },
+        ]}>
+        <Ionicons name={icon} size={size <= 40 ? 19 : 20} color={colors.iconPrimary} />
+      </Pressable>
+    );
+  }
   return (
     <PressableSurface
       level="raise1"

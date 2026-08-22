@@ -21,7 +21,9 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { Ionicons } from "@expo/vector-icons";
 import { scheduleOnRN } from "react-native-worklets";
+import { useColors } from "@/design/theme";
 
 if (Platform.OS === "android") {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -65,6 +67,7 @@ const getIconForType = (type: ToastVariant) => {
   }
 };
 export const Toast: React.FC<ToastProps> = ({ toast, index }) => {
+  const colors = useColors();
   const prevContentRef = useRef<string | React.ReactNode | null>(null);
   const prevTypeRef = useRef<ToastVariant | null>(null);
   const prevIndexRef = useRef<number>(-1);
@@ -280,6 +283,13 @@ export const Toast: React.FC<ToastProps> = ({ toast, index }) => {
 
   const icon = getIconForType(toast.options.type);
 
+  const actions =
+    toast.options.actions && toast.options.actions.length > 0
+      ? toast.options.actions
+      : toast.options.action
+        ? [toast.options.action]
+        : null;
+
   const renderExpandedContent = () => {
     if (!hasExpandedContent) return null;
 
@@ -301,7 +311,10 @@ export const Toast: React.FC<ToastProps> = ({ toast, index }) => {
           marginTop: 0,
           marginBottom: 0,
           position: "absolute",
-          top: toast.options.position === "top" ? 80 : undefined,
+          top:
+            toast.options.position === "top"
+              ? (toast.options.topOffset ?? 80)
+              : undefined,
           bottom: toast.options.position === "bottom" ? 0 : undefined,
         },
         _styles,
@@ -321,19 +334,35 @@ export const Toast: React.FC<ToastProps> = ({ toast, index }) => {
               toast.content
             )}
           </View>
-          {toast.options.action && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => {
-                toast?.options?.action?.onPress!();
-                animatedDismiss();
-              }}
-            >
-              <Text style={styles.actionText}>
-                {toast.options.action.label}
-              </Text>
-            </TouchableOpacity>
+          {actions && (
+            <View style={styles.actionsRow}>
+              {actions.map((a) => (
+                <TouchableOpacity
+                  key={a.label}
+                  style={[styles.actionButton, { backgroundColor: colors.accentDim }]}
+                  onPress={() => {
+                    a.onPress();
+                    animatedDismiss();
+                  }}
+                >
+                  <Text style={[styles.actionText, { color: colors.accentInk }]}>
+                    {a.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
+          {toast.options.dismissible ? (
+            <TouchableOpacity
+              style={styles.dismissButton}
+              onPress={animatedDismiss}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss notification"
+            >
+              <Ionicons name="close" size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Expanded Content */}
@@ -391,16 +420,22 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   actionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    marginLeft: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginLeft: 8,
   },
   actionText: {
-    color: "#fff",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  dismissButton: {
+    padding: 6,
+    marginLeft: 4,
   },
   expandedContent: {
     overflow: "hidden",

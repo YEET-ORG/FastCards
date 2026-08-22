@@ -80,6 +80,38 @@ export interface ColorTokens {
   chipGold: string;
   chipGoldStroke: string;
 
+  /** Chat/AI-surface roles (AI_CHAT_UI_UX_SPEC §16.5). */
+  /** Screen ground for the chat-first shell. */
+  screenBackground: string;
+  /** Ink on a `textPrimary` fill (user bubbles, new-chat pill). */
+  textInverse: string;
+  /** Quietest text tier (labels, captions, muted markers). */
+  textMuted: string;
+  /** Strongest surface (think blocks, composer pill, code blocks). */
+  surfaceStrong: string;
+  /** Floating card surface (context menus, suggestion pills on dark). */
+  surfaceCard: string;
+  /** Dialog surface. */
+  surfaceOverlay: string;
+  /** Faintest border tier (search input, thread rows). */
+  borderSubtle: string;
+  /** Composer border while focused. */
+  borderNav: string;
+  /** Separator hairline. */
+  hairline: string;
+  /** Active drawer row / nav-pill fill. */
+  navActiveBg: string;
+  /** Markdown links and blockquote rules. */
+  accentSol: string;
+  /** Stop button, destructive actions. */
+  accentNegative: string;
+  /** Positive/confirmed actions. */
+  accentPositive: string;
+  /** Send button fill (inverted pill). */
+  floatingPillBackground: string;
+  /** Send button glyph. */
+  floatingPillText: string;
+
   member: Record<MemberHueId, MemberHue>;
 
   /** @deprecated alias of cream — keep through post-revamp cleanup */
@@ -201,6 +233,22 @@ export const white: ColorTokens = withAliases({
   chipGoldStroke: '#C9A96A',
   goldDim: '#F5EBD6',
 
+  screenBackground: '#F7F8FA',
+  textInverse: '#FFFFFF',
+  textMuted: '#9A9DA3',
+  surfaceStrong: '#FFFFFF',
+  surfaceCard: '#FFFFFF',
+  surfaceOverlay: '#FFFFFF',
+  borderSubtle: 'rgba(0,0,0,0.06)',
+  borderNav: 'rgba(0,0,0,0.12)',
+  hairline: 'rgba(0,0,0,0.08)',
+  navActiveBg: 'rgba(0,0,0,0.06)',
+  accentSol: '#3B6FD4',
+  accentNegative: '#D33F45',
+  accentPositive: '#0F9D63',
+  floatingPillBackground: '#1A1A1A',
+  floatingPillText: '#FFFFFF',
+
   member: whiteMember,
 });
 
@@ -251,6 +299,22 @@ export const black: ColorTokens = withAliases({
   chipGold: '#E8C98A',
   chipGoldStroke: '#C9A96A',
   goldDim: '#241D10',
+
+  screenBackground: '#000000',
+  textInverse: '#0D0D0D',
+  textMuted: '#757575',
+  surfaceStrong: '#1A1A1A',
+  surfaceCard: '#141414',
+  surfaceOverlay: '#111111',
+  borderSubtle: 'rgba(255,255,255,0.04)',
+  borderNav: 'rgba(255,255,255,0.10)',
+  hairline: 'rgba(255,255,255,0.07)',
+  navActiveBg: 'rgba(255,255,255,0.07)',
+  accentSol: '#5B8DEF',
+  accentNegative: '#FF6B70',
+  accentPositive: '#34D399',
+  floatingPillBackground: '#FFFFFF',
+  floatingPillText: '#0D0D0D',
 
   member: blackMember,
 });

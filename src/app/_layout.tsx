@@ -21,14 +21,16 @@ import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider, Stac
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
-import { Appearance, StyleSheet } from 'react-native';
+import { AppState, Appearance, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { enableFreeze } from 'react-native-screens';
 
 import { AuthProvider, useAuth } from '@/auth/AuthContext';
 import { PRIVY_APP_ID, PRIVY_CLIENT_ID } from '@/auth/privyConfig';
 import { RestoringScreen } from '@/auth/RestoringScreen';
 import { SignInScreen } from '@/auth/SignInScreen';
 import { ToastProvider } from '@/components/fin/Toast';
+import { AiActivityNotifier } from '@/components/fin/AiActivityNotifier';
 import { ThemeProvider, useTheme } from '@/design/theme';
 import { palettes, type ThemeName } from '@/design/tokens';
 import { CurrencyProvider } from '@/domain/currency';
@@ -38,9 +40,19 @@ import {
   markOnboardingComplete,
 } from '@/onboarding/persistence';
 import { OnboardingScreen } from '@/onboarding/OnboardingScreen';
+import { flushChatStorage } from '@/store/chatStore';
 
 Appearance.setColorScheme('light');
 SplashScreen.preventAutoHideAsync();
+// Freeze offscreen screens so the chat shell's gesture and streaming work is
+// never paid for twice (AI_CHAT_UI_UX_SPEC §2.3).
+enableFreeze(true);
+
+// Chat persistence is throttled to 1/s so streaming does not thrash
+// AsyncStorage; flush here so backgrounding never drops the tail (spec §2.4).
+AppState.addEventListener('change', (next) => {
+  if (next === 'background' || next === 'inactive') flushChatStorage();
+});
 
 /**
  * Built once per mode instead of rebuilt inline on every render. The object
@@ -147,6 +159,7 @@ function Gate() {
         <Stack.Screen name="payments" />
         <Stack.Screen name="transaction/[id]" />
       </Stack>
+      <AiActivityNotifier />
     </DomainProvider>
   );
 }

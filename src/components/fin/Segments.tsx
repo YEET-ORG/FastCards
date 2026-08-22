@@ -9,10 +9,12 @@ export function Segments({
   labels,
   index,
   onChange,
+  dense = false,
 }: {
   labels: string[];
   index: number;
   onChange: (i: number) => void;
+  dense?: boolean;
 }) {
   const colors = useColors();
   const well = useDepth('well');
@@ -27,7 +29,8 @@ export function Segments({
         activeSegmentBackgroundColor={colors.raised}
         dividerColor={colors.line}
         borderRadius={radius.control}
-        paddingVertical={10}>
+        paddingVertical={dense ? 6 : 10}
+        marginVertical={dense ? 12 : 20}>
         {labels.map((l) => (
           <AppText
             key={l}

@@ -39,6 +39,7 @@ const SegmentedControl: React.FC<ISegmentedControl> &
   dividerColor,
   borderRadius = 8,
   disableScaleEffect = false,
+  marginVertical = 20,
 }: ISegmentedControl):
   | (React.ReactNode & React.JSX.Element & React.ReactElement)
   | null => {
@@ -63,12 +64,12 @@ const SegmentedControl: React.FC<ISegmentedControl> &
 
   const triggerBlur = useCallback(() => {
     blurAmount.value = withSequence<number>(
-      withTiming<number>(10, {
-        duration: 400,
+      withTiming<number>(3, {
+        duration: 80,
         easing: Easing.inOut(Easing.ease),
       }),
       withTiming<number>(0, {
-        duration: 400,
+        duration: 80,
         easing: Easing.inOut(Easing.ease),
       }),
     );
@@ -77,12 +78,17 @@ const SegmentedControl: React.FC<ISegmentedControl> &
   const triggerTapScale = useCallback(() => {
     if (disableScaleEffect) return;
     activeScale.value = withSequence<number>(
-      withTiming<number>(1.3, { duration: 350 }),
-      withSpring<number>(1, { stiffness: 10, damping: 5, mass: 0.8 }),
+      withTiming<number>(1.08, { duration: 60 }),
+      withSpring<number>(1, { stiffness: 260, damping: 20, mass: 0.5 }),
     );
   }, [disableScaleEffect]);
   const memoizedTabPressCallback = useCallback(
     (index: number) => {
+      tabTranslate.value = withSpring<number>(index * translateValue, {
+        stiffness: 420,
+        damping: 32,
+        mass: 0.5,
+      });
       onChange(index);
       if (!isDragging.value) {
         triggerBlur();
@@ -90,14 +96,14 @@ const SegmentedControl: React.FC<ISegmentedControl> &
         impactAsync(ImpactFeedbackStyle.Medium);
       }
     },
-    [onChange, triggerBlur, triggerTapScale],
+    [onChange, triggerBlur, triggerTapScale, translateValue],
   );
 
   useEffect(() => {
     tabTranslate.value = withSpring<number>(currentIndex * translateValue, {
-      stiffness: 80,
-      damping: 90,
-      mass: 1,
+      stiffness: 420,
+      damping: 32,
+      mass: 0.5,
     });
   }, [currentIndex, translateValue]);
 
@@ -168,6 +174,7 @@ const SegmentedControl: React.FC<ISegmentedControl> &
             backgroundColor: finalSegmentedControlBackgroundColor,
             paddingVertical: paddingVertical,
             borderRadius,
+            marginVertical,
           },
         ]}
       >
@@ -242,7 +249,7 @@ const AnimatedDivider: React.FC<{
       dividerIndex === currentIndex || dividerIndex === currentIndex - 1;
 
     opacity.value = withTiming(shouldFadeOut ? 0 : 1, {
-      duration: 200,
+      duration: 120,
     });
   }, [currentIndex, dividerIndex]);
 

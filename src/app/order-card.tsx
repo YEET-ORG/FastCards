@@ -165,7 +165,7 @@ export default function OrderCardScreen() {
         ) : kyc === 'approved' ? (
           <Panel style={{ gap: space.l }}>
             <AppText variant="section">Order a card</AppText>
-            <Segments labels={['Personal', 'Purpose']} index={cardTypeIndex} onChange={setCardTypeIndex} />
+            <Segments dense labels={['Personal', 'Purpose']} index={cardTypeIndex} onChange={setCardTypeIndex} />
             <TextInput
               value={nickname}
               onChangeText={setNickname}

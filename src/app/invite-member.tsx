@@ -100,7 +100,7 @@ export default function InviteMemberScreen() {
             />
             <View style={{ gap: 6 }}>
               <AppText variant="label">Role</AppText>
-              <Segments labels={[...ROLE_LABELS]} index={roleIndex} onChange={setRoleIndex} />
+              <Segments dense labels={[...ROLE_LABELS]} index={roleIndex} onChange={setRoleIndex} />
             </View>
             <TextInput
               value={limitText}

@@ -87,6 +87,7 @@ export default function ActivityFeed() {
       />
 
       <Segments
+        dense
         labels={['All', 'Mine', 'Family', 'AI']}
         index={FILTERS.indexOf(filter)}
         onChange={(i) => setFilter(FILTERS[i])}

@@ -13,6 +13,7 @@ interface ISegmentedControl {
   readonly dividerColor?: string;
   readonly borderRadius?: number;
   readonly disableScaleEffect?: boolean;
+  readonly marginVertical?: number;
 }
 
 export { ISegmentedControl, SegmentedControlPreset };

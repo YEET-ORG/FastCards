@@ -31,6 +31,7 @@ export default function ApprovalCenter() {
       {/* The pending count rides on the segment it describes, now that the
           header carries no subtitle. */}
       <Segments
+        dense
         labels={[pending.length > 0 ? `Pending (${pending.length})` : 'Pending', 'Completed']}
         index={filter === 'pending' ? 0 : 1}
         onChange={(i) => setFilter(i === 0 ? 'pending' : 'completed')}

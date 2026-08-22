@@ -15,6 +15,7 @@ import React, {
   useState,
 } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { api, ApiError, resetApiBase, triedBases } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
@@ -24,7 +25,7 @@ import { useColors } from '@/design/theme';
 import { space } from '@/design/tokens';
 import { Toast } from '@/shared/ui/molecules/Toast';
 
-import type { DomainState } from './types';
+import type { AuditEvent, DomainState } from './types';
 
 type DomainAction =
   | { type: 'freeze_card'; cardId: string }
@@ -44,6 +45,11 @@ interface DomainContextValue {
    * success until the backend confirms it. */
   dispatchOrThrow: (action: DomainAction) => Promise<void>;
   refresh: () => Promise<void>;
+  /** The newest audit event that arrived since the persisted activity
+   * cursor. The AI notification pill keys off this; cleared via
+   * `clearNewActivity`. */
+  newActivity: AuditEvent | null;
+  clearNewActivity: () => void;
 }
 
 const DomainContext = createContext<DomainContextValue | null>(null);
@@ -53,18 +59,125 @@ const showError = (e: unknown) => {
   Toast.show(message, { type: 'default', position: 'bottom' });
 };
 
+/** Kinds that surface as an AI notification pill (scope A). */
+const NOTIFY_KINDS: ReadonlySet<AuditEvent['kind']> = new Set(['ai_action', 'approval_event']);
+
+/**
+ * Activity diffing (spec: true activity-change detection). The audit ledger
+ * is append-only and the server returns it sorted `(at DESC, id DESC)`, so a
+ * persisted `{ at, id }` cursor is a total order over everything the user has
+ * seen. The cursor advances over ALL new events (not just notifiable kinds)
+ * so non-AI activity never re-enters the window; only the newest
+ * ai_action/approval_event is emitted.
+ */
+interface ActivityCursor {
+  at: string;
+  id: number;
+}
+
+const cursorKey = (userId: string) => `fastcards.activity-cursor.${userId}`;
+
+const cmp = (atA: string, idA: number | string, atB: string, idB: number | string): number => {
+  if (atA === atB) return Number(idA) - Number(idB);
+  return atA < atB ? -1 : 1;
+};
+
+const cmpEvent = (a: AuditEvent, b: AuditEvent): number => cmp(a.at, a.id, b.at, b.id);
+
+const cmpCursor = (e: AuditEvent, c: ActivityCursor): number => cmp(e.at, e.id, c.at, c.id);
+
+const cursorOf = (e: AuditEvent): ActivityCursor => ({ at: e.at, id: Number(e.id) });
+
+const maxEvent = (list: AuditEvent[]): AuditEvent =>
+  list.reduce((best, e) => (cmpEvent(e, best) > 0 ? e : best));
+
 export function DomainProvider({ children }: React.PropsWithChildren) {
   const { headers, session } = useAuth();
   const [state, setState] = useState<DomainState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [newActivity, setNewActivity] = useState<AuditEvent | null>(null);
   const headersRef = useRef(headers);
   headersRef.current = headers;
+
+  // Activity cursor: `savedCursorRef` holds the durable value read from
+  // AsyncStorage; `cursorRef` is the live cursor the next refresh diffs
+  // against. `baselineSetRef` is true once the cursor has been anchored to
+  // a fetch — a fresh install anchors silently (no history flood).
+  const savedCursorRef = useRef<ActivityCursor | null>(null);
+  const cursorRef = useRef<ActivityCursor | null>(null);
+  const baselineSetRef = useRef(false);
+
+  const persistCursor = useCallback((userId: string, cursor: ActivityCursor) => {
+    AsyncStorage.setItem(cursorKey(userId), JSON.stringify(cursor)).catch(() => {
+      // Persistence is best-effort; a failed write only risks re-notifying.
+    });
+  }, []);
+
+  // Load the durable cursor whenever the signed-in user changes.
+  useEffect(() => {
+    savedCursorRef.current = null;
+    cursorRef.current = null;
+    baselineSetRef.current = false;
+    const userId = session?.userId;
+    if (!userId) return;
+    let cancelled = false;
+    AsyncStorage.getItem(cursorKey(userId))
+      .then((raw) => {
+        if (cancelled || !raw) return;
+        try {
+          savedCursorRef.current = JSON.parse(raw) as ActivityCursor;
+        } catch {
+          savedCursorRef.current = null;
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.userId]);
+
+  /**
+   * Diff the fetched audit events against the live cursor and surface the
+   * newest notifiable event. Advances the cursor over everything new and
+   * persists it BEFORE emitting, so concurrent refreshes cannot re-emit.
+   */
+  const diffActivity = useCallback(
+    (events: AuditEvent[]) => {
+      const userId = session?.userId;
+      if (!userId || events.length === 0) return;
+
+      if (!baselineSetRef.current) {
+        baselineSetRef.current = true;
+        const saved = savedCursorRef.current;
+        if (!saved) {
+          // First run (or cursor lost): anchor to the latest event silently
+          // so seeded history never floods the notification pill.
+          cursorRef.current = cursorOf(maxEvent(events));
+          return;
+        }
+        cursorRef.current = saved;
+      }
+
+      const cursor = cursorRef.current;
+      if (!cursor) return;
+      const fresh = events.filter((e) => cmpCursor(e, cursor) > 0);
+      if (fresh.length === 0) return;
+      cursorRef.current = cursorOf(maxEvent(fresh));
+      persistCursor(userId, cursorRef.current);
+      const freshNotifiable = fresh.filter((e) => NOTIFY_KINDS.has(e.kind));
+      if (freshNotifiable.length > 0) {
+        setNewActivity(maxEvent(freshNotifiable));
+      }
+    },
+    [persistCursor, session?.userId],
+  );
 
   const refresh = useCallback(async () => {
     try {
       const next = await api.fetchDomainState(headersRef.current);
       setState(next);
       setError(null);
+      diffActivity(next.events);
     } catch (e) {
       if (state === null) {
         setError(e instanceof ApiError ? e.message : 'Could not reach the FastCards server.');
@@ -73,11 +186,14 @@ export function DomainProvider({ children }: React.PropsWithChildren) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state === null]);
+  }, [state === null, diffActivity]);
+
+  const clearNewActivity = useCallback(() => setNewActivity(null), []);
 
   useEffect(() => {
     setState(null);
     setError(null);
+    setNewActivity(null);
     void refresh();
     // Refetch when the signed-in user changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -173,8 +289,11 @@ export function DomainProvider({ children }: React.PropsWithChildren) {
   );
 
   const value = useMemo<DomainContextValue | null>(
-    () => (state ? { state, dispatch, dispatchOrThrow, refresh } : null),
-    [state, dispatch, dispatchOrThrow, refresh],
+    () =>
+      state
+        ? { state, dispatch, dispatchOrThrow, refresh, newActivity, clearNewActivity }
+        : null,
+    [state, dispatch, dispatchOrThrow, refresh, newActivity, clearNewActivity],
   );
 
   if (error) {
