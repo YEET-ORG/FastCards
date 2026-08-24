@@ -20,7 +20,7 @@ if (!config.PRIVY_APP_ID || !config.PRIVY_APP_SECRET) throw new Error('Privy cre
 const privy = new PrivyClient({ appId: config.PRIVY_APP_ID, appSecret: config.PRIVY_APP_SECRET });
 
 console.log('creating user wallet via Privy…');
-const wallet = await privy.wallets().create({ chain_type: 'stellar', display_name: 'fastcards-demo-user' });
+const wallet = await privy.wallets().create({ chain_type: 'stellar', display_name: 'kami-demo-user' });
 console.log('user wallet:', wallet.address, `(privy id ${wallet.id})`);
 
 console.log('funding via friendbot…');

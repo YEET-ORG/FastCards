@@ -1,5 +1,4 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
-import type { ScrollView } from 'react-native';
 import { useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 type ScrollDir = 'up' | 'down';
@@ -112,8 +111,4 @@ export function useAskDock(): AskDockController {
 
 export function useAskDockOptional(): AskDockController | null {
   return useContext(AskDockContext);
-}
-
-export function scrollViewToTop(ref: React.RefObject<ScrollView | null>) {
-  ref.current?.scrollTo({ y: 0, animated: true });
 }

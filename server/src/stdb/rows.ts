@@ -14,11 +14,9 @@ import type {
 import type {
   Approvals,
   AuditEvents,
-  Balances,
   CardOrders,
   Cards,
   Deposits,
-  Invites,
   MemberCategories,
   Members,
   Pool,
@@ -211,15 +209,6 @@ export const mapOrder = (o: CardOrders) => ({
   updated_at: o.updatedAt,
 });
 
-export const mapInvite = (i: Invites) => ({
-  code: i.code,
-  member_id: i.memberId,
-  created_by: i.createdBy,
-  status: i.status,
-  created_at: i.createdAt,
-  accepted_at: orNull(i.acceptedAt),
-});
-
 export const mapWallet = (w: UserWallets) => ({
   user_id: w.userId,
   address: w.address,
@@ -227,8 +216,6 @@ export const mapWallet = (w: UserWallets) => ({
   source: w.source,
   linked_at: w.linkedAt,
 });
-
-export const mapBalance = (b: Balances) => ({ scope: b.scope, amount: b.amount });
 
 export interface PreparedActionRowShape {
   id: string;

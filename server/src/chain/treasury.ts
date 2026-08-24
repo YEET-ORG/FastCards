@@ -130,7 +130,7 @@ export async function bootstrapPool(
 
   const wallet = await client.wallets().create({
     chain_type: 'stellar',
-    display_name: 'fastcards-pool',
+    display_name: 'kami-pool',
   });
 
   const fb = await fetchFn(`https://friendbot.stellar.org/?addr=${wallet.address}`);

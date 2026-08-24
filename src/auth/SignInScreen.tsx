@@ -90,7 +90,7 @@ export function SignInScreen() {
     <View style={[styles.root, { backgroundColor: colors.bg, paddingTop: insets.top + space.x40, paddingBottom: insets.bottom + space.xl }]}>
       <View style={styles.hero}>
         <AppText variant="label" tone={colors.accentInk}>
-          FASTCARDS
+          KAMI
         </AppText>
         <AppText variant="hero" style={{ fontSize: 38, lineHeight: 44 }}>
           Your money, one conversation away.

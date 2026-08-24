@@ -37,7 +37,7 @@ export default async function setup(): Promise<() => void> {
 
   await execFileP(
     BIN,
-    ['publish', 'fastcards-test', '--server', 'local', '--delete-data=always', '--yes'],
+    ['publish', 'kami-test', '--server', 'local', '--delete-data=always', '--yes'],
     { cwd: SERVER_ROOT },
   );
 

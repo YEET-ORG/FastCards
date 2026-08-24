@@ -1,4 +1,4 @@
-// FastCards reducers — the only write path into the system of record.
+// Kami reducers — the only write path into the system of record.
 //
 // Trust model: the Node service is the single client (the database
 // owner). It handles auth (Privy), role checks, HTTP side effects
@@ -26,7 +26,7 @@ function err(code: string, message: string): never {
 function assertGateway(ctx: Ctx): void {
   const cfg = ctx.db.module_config.id.find(0);
   if (!cfg || !cfg.owner.equals(ctx.sender)) {
-    err('permission_denied', 'Only the FastCards gateway may call reducers.');
+    err('permission_denied', 'Only the Kami gateway may call reducers.');
   }
 }
 
@@ -211,6 +211,7 @@ function seedIfEmpty(ctx: Ctx): void {
     approvedBy: string | undefined, at: string,
   ) =>
     ctx.db.transactions.insert({ id, merchant, memberId, cardId, amount, direction, category, status, declineReason, approvedBy, at });
+  txn('t-zomato', 'Zomato', 'm-maya', 'c-maya', 389, 'debit', 'Food', 'settled', undefined, undefined, ago(45 * min));
   txn('t-swiggy', 'Swiggy', 'm-maya', 'c-maya', 640, 'debit', 'Food', 'settled', undefined, undefined, ago(2 * hour));
   txn('t-amazon', 'Amazon', 'm-rohan', 'c-personal', 1299, 'debit', 'Shopping', 'settled', undefined, undefined, ago(5 * hour));
   txn('t-bmtc', 'BMTC Transit', 'm-arjun', 'c-arjun', 35, 'debit', 'Transport', 'settled', undefined, undefined, ago(7 * hour));
@@ -242,7 +243,7 @@ export const init = spacetimedb.init((ctx) => {
 /** Test/dev-only: wipe and reseed. Gateway-gated plus an explicit token. */
 export const devReset = spacetimedb.reducer({ confirm: t.string() }, (ctx, { confirm }) => {
   assertGateway(ctx);
-  if (confirm !== 'RESET-FASTCARDS') err('invalid_request', 'Reset confirmation token mismatch.');
+  if (confirm !== 'RESET-KAMI') err('invalid_request', 'Reset confirmation token mismatch.');
   const wipe = (tbl: { iter(): Iterable<unknown> } & Record<string, any>, pk: string) => {
     for (const row of [...tbl.iter()]) tbl[pk].delete((row as Record<string, unknown>)[pk]);
   };

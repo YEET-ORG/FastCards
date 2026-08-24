@@ -2,11 +2,11 @@
 
 | Field | Value |
 |---|---|
-| **Document** | FastCards visual system replacement |
+| **Document** | Kami visual system replacement |
 | **Author** | Engineering (draft for implementation) |
 | **Date** | 2026-08-19 |
 | **Status** | Draft |
-| **Product** | FastCards — Expo SDK 57, React Native 0.86, expo-router (`src/app`) |
+| **Product** | Kami — Expo SDK 57, React Native 0.86, expo-router (`src/app`) |
 | **Scope** | UI-only. SpacetimeDB, gateway, CopilotKit trust boundary, and execute path are unchanged. |
 | **Replaces** | Obsidian / Quiet Intelligence (`src/design/tokens.ts`, CLAUDE.md Visual Direction, UI spec dark palette) |
 
@@ -16,7 +16,7 @@ This document is the implementation contract for the visual and interaction reva
 
 ## Overview
 
-FastCards currently ships as a dark, Kast-inspired neobank: Inter, mint CTAs, a Skia morphing tab bar, a metal `LinearGradient` payment card, and a mesh-gradient Cards hub. Token canvas is `#050506`; splash/`app.json` `backgroundColor` is `#070908` (CLAUDE.md Obsidian). Both go away. That system is **Obsidian / Quiet Intelligence**. It reads as a crypto OS, not a family money product.
+Kami currently ships as a dark, Kast-inspired neobank: Inter, mint CTAs, a Skia morphing tab bar, a metal `LinearGradient` payment card, and a mesh-gradient Cards hub. Token canvas is `#050506`; splash/`app.json` `backgroundColor` is `#070908` (CLAUDE.md Obsidian). Both go away. That system is **Obsidian / Quiet Intelligence**. It reads as a crypto OS, not a family money product.
 
 This revamp replaces it with **Sunlit Household** (default light) and **Night Household** (in-app dark). Personality: warm Indian-garden family neobank — cream paper, terracotta as the only brand fill, Fraunces for titles and hero money, Plus Jakarta Sans for UI, and twelve block-print plastic card faces. Color lives on objects (members, cards, chips, active nav, primary buttons, progress). Paper, body copy, money amounts, and execute facts stay quiet.
 
@@ -109,7 +109,7 @@ Locked in the grilling session unless noted as an implementation decision.
 | K3 | Tokens are a dual dictionary with identical keys. Screens never branch on hex. | 1:1 mapping; Night is not a restyle, it is a swap. |
 | K4 | **Accented objects, quiet paper.** Color on members/cards/chips/active nav/primary buttons/progress only. | Money amounts, body, execute facts, PAN/CVV stay espresso/cream. Trust > decoration. |
 | K5 | Brand fill is terracotta `#E06A3A`. Success mint is `#1B9A6C` (Sunlit). Mint is no longer brand. | Separates CTA from “it worked.” Light-mode contrast. |
-| K6 | Interaction primitives everywhere, shaders almost never. Reacticx is the motion chassis; FastCards owns financial primitives. | Avoids a component-gallery look. |
+| K6 | Interaction primitives everywhere, shaders almost never. Reacticx is the motion chassis; Kami owns financial primitives. | Avoids a component-gallery look. |
 | K7 | Cards are **colorful plastic block-print**, 12 Imagine faces, same assets in Night. Frozen = same art desaturated + Frozen badge off-card. | Not metal. Identity is the garden, not a sheen. |
 | K8 | `PaymentCardVisual` is `expo-image` (active) or Skia `Image`+`ColorMatrix` (frozen/closed) + overlay. Type/chip/last-4 are composited in RN. Never wrap `expo-image` in Skia ColorMatrix. | Imagine art must not contain credentials. Skia filters only Skia children. |
 | K9 | Four tabs stay. **`HouseholdTabBar` rewrites** copied `stack-aware-tabs` (full-width labeled pill). Do not wrap the unmodified copy (`maxWidth: 200`, no labels, `#101010` bar). | Icon + Jakarta 11 label, selected icon scales 1.12. No morphing bar, no BlurView. |
@@ -121,7 +121,7 @@ Locked in the grilling session unless noted as an implementation decision.
 | K15 | Motion: 180–280 ms springs. Reduced motion: snap, no springs, no carousel tilt. | Friendly, not decorative. |
 | K16 | **Implementation:** introduce `src/app/profile.tsx` (missing today). Avatar currently `Alert`s; it must navigate to Profile because that is the only legal home for the theme toggle. | Spec UI §37 already required this screen. |
 | K17 | **Implementation:** split `color.mint` (success) from `color.accent` (terracotta). Do not remap `color.mint` → terracotta. | Prevents success/incoming/approval chrome from going orange. |
-| K18 | **Implementation:** persist theme in SecureStore key `fastcards.appearance.mode` (`sunlit` \| `night`). Do not follow OS. On change, `Appearance.setColorScheme` so keyboard/status bar match. | Locked “in-app toggle only.” |
+| K18 | **Implementation:** persist theme in SecureStore key `kami.appearance.mode` (`sunlit` \| `night`). Do not follow OS. On change, `Appearance.setColorScheme` so keyboard/status bar match. | Locked “in-app toggle only.” |
 | K19 | **Implementation:** resolve card art by **`memberId` then variant**, then seed id. Mapping lives in `src/design/cardArt.ts`, not in SpacetimeDB. New Maya/Arjun/Dad cards keep their garden. | Identity is the garden per person, not a seed-id lookup that misses `order-card`. |
 | K20 | **Implementation:** `Screen` reports scroll direction (`scrollEventThrottle={16}`) and exposes `scrollToTopRef`. Ask Home’s custom `ScrollView` registers the **same** `scrollToTopRef` (or a dock-context register) **and** `setAskHome(true)` in `useFocusEffect`. Dock is a **sibling overlay of the full `Tabs` layout** in `(tabs)/_layout.tsx` (`bottom = tabBarHeight + 8` closed, `bottom = keyboardHeight + 8` open). `vaultOpen` is **defensive**. | One dock. Re-tapping Ask scrolls to top. |
 | K21 | **Implementation:** PR1 keeps **deprecated aliases** on `ColorTokens`: `surface1→cream`, `surface2→raised`, `surface3→inset`, `borderSoft→line`, `borderStrong→lineStrong`, `success→mint`, `gold`/`goldDim` for the EMV chip until PR3 (`chipGold`). Do not delete old keys until a cleanup after PR5. | ~35 files / 100+ sites still read `color.surface1` etc. PR1 must `tsc --noEmit`. |
@@ -240,7 +240,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Appearance, AccessibilityInfo } from 'react-native';
 import { palettes, type ColorTokens, type ThemeName } from './tokens';
 
-const STORE_KEY = 'fastcards.appearance.mode';
+const STORE_KEY = 'kami.appearance.mode';
 
 type ThemeContextValue = {
   mode: ThemeName;                 // 'sunlit' | 'night'
@@ -288,7 +288,7 @@ export function useColors(): ColorTokens;
 
 **Persistence**
 
-- Key: `fastcards.appearance.mode`
+- Key: `kami.appearance.mode`
 - Values: `'sunlit'` | `'night'`
 - Store: `expo-secure-store` (already a plugin). There is **no AsyncStorage** in `package.json`; SecureStore is the justified persistence, same pattern as `fc.devUserId` in `src/auth/AuthContext.tsx`. The value is not a secret.
 - Missing/corrupt → `'sunlit'`.
@@ -771,7 +771,7 @@ npx tsc --noEmit
 
 **Why a rewrite (upstream cannot meet K9)**
 
-Verified against https://www.reacticx.com/docs/components/stack-aware-tabs: `StackAwareTabBar` is `React.FC<BottomTabBarProps>` with hardcoded `#101010` bar, `#fff`/`#6b7280` icons, **no label rendering** (label is computed, never shown), `maxWidth: 200` (three-icon island, not four labeled tabs), `SCALE_UP = 1.2`, `expo-blur` glass on a nested-stack back button, no `light`/`dark` theme props. FastCards has **no nested stack inside tabs** — flows live on the root stack — so the “stack-aware” back button never appears.
+Verified against https://www.reacticx.com/docs/components/stack-aware-tabs: `StackAwareTabBar` is `React.FC<BottomTabBarProps>` with hardcoded `#101010` bar, `#fff`/`#6b7280` icons, **no label rendering** (label is computed, never shown), `maxWidth: 200` (three-icon island, not four labeled tabs), `SCALE_UP = 1.2`, `expo-blur` glass on a nested-stack back button, no `light`/`dark` theme props. Kami has **no nested stack inside tabs** — flows live on the root stack — so the “stack-aware” back button never appears.
 
 **PR2 rewrite budget:** one new file `src/components/fin/HouseholdTabBar.tsx` (~150–250 lines) that *keeps* the selected-icon scale spring from the copy and *throws away* maxWidth island, BlurView, unlabeled icons, pan-scrub (pan-scrub fights the Cards horizontal carousel). Paint from `useColors()`. Delete `KastTabBar.tsx` in the same PR.
 
@@ -1175,7 +1175,7 @@ Badge sits in an 8pt gap **below** the card visual, left-aligned, or in the stat
 
 ### PaymentCardVisual rewrite
 
-Replace `LinearGradient` metal (`materialFor`, sheen, METAL/FAMILY tags, FASTCARDS wordmark) with:
+Replace `LinearGradient` metal (`materialFor`, sheen, METAL/FAMILY tags, KAMI wordmark) with:
 
 ```
 <View accessibilityLabel={`${nickname} card, ending ${last4}, ${status}`}>
@@ -1234,7 +1234,7 @@ Generate at 2048 on the long side, then crop to 1056×666. Reject any frame with
 
 ### Art production owner and PR3 gate
 
-- **Owner:** FastCards design/engineering generates the 12 faces with Grok Imagine using the prompts above, then crops to 1056×666.
+- **Owner:** Kami design/engineering generates the 12 faces with Grok Imagine using the prompts above, then crops to 1056×666.
 - **PR3 does not start** until `assets/cards/*.png` (all 12) exist in the tree.
 - **QA gate (attach to the PR):** screenshots of all 12 faces + frozen + closed (`c-amzn`) with last-4 readable, chip zone clear, no letters in the PNG. Fail the PR if any face collides with last-4 or contains type.
 - Metro: every `require()` in `CARD_ART` must resolve. No missing-file crash.
@@ -1513,7 +1513,7 @@ Household / Security placeholders may wait for PR5. No System option. No second 
 
 ### Sign-in — `src/auth/SignInScreen.tsx`
 
-Paper canvas. Wordmark `label` in `accentInk` (“FASTCARDS”). Hero Fraunces “Your money, one conversation away.” Supporting clay. Primary “Continue with email” terracotta pill. Dev user rows cream. Inputs raised, espresso.
+Paper canvas. Wordmark `label` in `accentInk` (“KAMI”). Hero Fraunces “Your money, one conversation away.” Supporting clay. Primary “Continue with email” terracotta pill. Dev user rows cream. Inputs raised, espresso.
 
 Code step: **keep the existing `TextInput`** unless an `otp-input` spike is clean (unknown native surface). A 6-cell look can be product UI on the same `TextInput` (Jakarta tabular, `lineStrong` on focus, terracotta caret, letter-spacing already in `SignInScreen`). Do not block PR3 on Reacticx otp-input.
 

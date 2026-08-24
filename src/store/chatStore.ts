@@ -26,7 +26,7 @@ export interface StoredMessage {
   /** Trace from thinking blocks, if any. */
   reasoning?: string;
   streaming?: boolean;
-  /** FastCards: the reply came from the degraded/scripted fallback. */
+  /** Kami: the reply came from the degraded/scripted fallback. */
   degraded?: boolean;
   createdAt: number;
   cards?: StoredCard[];
@@ -36,7 +36,7 @@ export interface Conversation {
   id: string;
   title: string;
   messages: StoredMessage[];
-  /** Kept for spec parity; FastCards has no local models. */
+  /** Kept for spec parity; Kami has no local models. */
   modelPath?: string;
   createdAt: number;
   updatedAt: number;
@@ -228,7 +228,7 @@ function createPersistStorage<S>(
   };
 }
 
-const CHAT_STORE_KEY = '@fastcards:chat';
+const CHAT_STORE_KEY = '@kami:chat';
 
 /** The subset of state that crosses the persist boundary. */
 type PersistedChatState = Pick<
@@ -405,10 +405,6 @@ export const useChatStore = create<ChatStore>()(
     },
   ),
 );
-
-export function activeConversation(state: ChatStoreState): Conversation | undefined {
-  return state.conversations.find((c) => c.id === state.activeId);
-}
 
 export { newMsgId };
 

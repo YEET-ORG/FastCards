@@ -12,7 +12,7 @@ import type { StoredCard } from '@/store/chatStore';
 /**
  * Card registry (AI_CHAT_UI_UX_SPEC §12.2). Lifecycle short-circuits run
  * BEFORE the type switch; then the type dispatch. The concrete bodies are
- * FastCards-domain-specific; the registry shape, width system, lifecycle
+ * Kami-domain-specific; the registry shape, width system, lifecycle
  * states, entrance and action dispatch are the ported contract.
  */
 

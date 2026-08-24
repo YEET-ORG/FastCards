@@ -7,7 +7,7 @@
 // request fail with `invalid_native_app_id`. Without a client id, Privy
 // validates against the app-level `allowed_native_app_ids`, which is
 // configured (via the management API) to allow `host.exp.Exponent`
-// (Expo Go) and `com.fastcards.app` (dev builds). To use the mobile
+// (Expo Go) and `com.kami.app` (dev builds). To use the mobile
 // client again, add those identifiers to it in Dashboard → App settings
 // → Clients, then set EXPO_PUBLIC_PRIVY_CLIENT_ID.
 

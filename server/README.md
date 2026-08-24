@@ -1,4 +1,4 @@
-# FastCards Server
+# Kami Server
 
 Financial Domain Backend for the AI-native family neobank (see
 `../AI_FAMILY_NEOBANK_PRODUCT_DESIGN_SPEC.md`). It is the single source of

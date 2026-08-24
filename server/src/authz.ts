@@ -154,11 +154,7 @@ export function canReadMember(session: Session, memberId: string): boolean {
   return isManager(session) || session.memberId === memberId;
 }
 
-export function assertCanReadMember(session: Session, memberId: string): void {
-  if (!canReadMember(session, memberId)) {
-    throw new DomainError('permission_denied', 'You can only view your own activity.');
-  }
-}
+
 
 /**
  * Step-up authentication (spec §40.2). Prototype accepts the mock

@@ -75,7 +75,7 @@ interface ActivityCursor {
   id: number;
 }
 
-const cursorKey = (userId: string) => `fastcards.activity-cursor.${userId}`;
+const cursorKey = (userId: string) => `kami.activity-cursor.${userId}`;
 
 const cmp = (atA: string, idA: number | string, atB: string, idB: number | string): number => {
   if (atA === atB) return Number(idA) - Number(idB);
@@ -180,7 +180,7 @@ export function DomainProvider({ children }: React.PropsWithChildren) {
       diffActivity(next.events);
     } catch (e) {
       if (state === null) {
-        setError(e instanceof ApiError ? e.message : 'Could not reach the FastCards server.');
+        setError(e instanceof ApiError ? e.message : 'Could not reach the Kami server.');
       } else {
         showError(e);
       }

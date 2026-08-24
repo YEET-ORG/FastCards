@@ -1,4 +1,4 @@
-// FastCards API client — the app's only door to the financial backend.
+// Kami API client — the app's only door to the financial backend.
 // Sends the auth headers provided by the AuthContext (dev: x-user-id;
 // live: Privy bearer token) and maps server rows (snake_case) onto the
 // app's domain types.
@@ -117,7 +117,7 @@ async function resolveBase(): Promise<string> {
   const bases = candidateBases();
   tried = bases;
   if (bases.length === 0) {
-    throw new Error('Could not reach the FastCards server.');
+    throw new Error('Could not reach the Kami server.');
   }
   try {
     const winner = await Promise.any(bases.map(probe));
@@ -125,7 +125,7 @@ async function resolveBase(): Promise<string> {
     if (__DEV__) console.log('[api] base', winner, '(tried', bases.join(', ') + ')');
     return winner;
   } catch {
-    throw new Error('Could not reach the FastCards server.');
+    throw new Error('Could not reach the Kami server.');
   }
 }
 
@@ -136,10 +136,6 @@ export function resetApiBase(): void {
   inflight = null;
 }
 
-/** The address currently in use, or null before the first successful probe. */
-export function lastResolvedBase(): string | null {
-  return resolvedBase;
-}
 
 /** The candidates the last resolution attempt considered — for dev hints. */
 export function triedBases(): string[] {

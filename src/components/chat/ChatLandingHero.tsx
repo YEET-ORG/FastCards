@@ -7,7 +7,7 @@ import { useColors } from '@/design/theme';
 import { useReduceMotion } from '@/design/motion';
 
 /**
- * Empty-thread landing hero (AI_CHAT_UI_UX_SPEC §10.6). FastCards has no local
+ * Empty-thread landing hero (AI_CHAT_UI_UX_SPEC §10.6). Kami has no local
  * model, so the hero is always "ready" — the loading pill stays available for
  * future use but is not driven by a model gate.
  */

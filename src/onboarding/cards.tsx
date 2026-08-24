@@ -30,13 +30,13 @@ import Animated, {
 
 import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
-import { PrimaryButton, SecondaryButton, TextButton } from '@/components/fin/Buttons';
+import { SecondaryButton, TextButton } from '@/components/fin/Buttons';
 import { AppText } from '@/design/AppText';
 import { useReduceMotion } from '@/design/motion';
 import { useColors, useDepth, useTheme } from '@/design/theme';
+import { useMoney } from '@/domain/currency';
 import { font, space } from '@/design/tokens';
 import { useDomain } from '@/domain/store';
-import { formatMoneyINR } from '@/domain/money';
 import QRCode from '@/shared/ui/base/qr-code';
 
 import { onboardingCopy } from './copy';
@@ -278,68 +278,6 @@ export function WorkingPill({ label, meta }: WorkingPillProps) {
   );
 }
 
-// ── ReviewCard — fact-list summary before the finish line ─────────────────
-
-type ReviewCardProps = {
-  readonly householdName: string;
-  readonly membersCount: number;
-  readonly budgetAmount: number;
-  readonly totalAvailable: number;
-  readonly onStart: () => void;
-  /** Omitted for members who cannot change the household budget — the row is
-   * dropped rather than shown disabled, so nothing offers an authority the
-   * session does not have. */
-  readonly onChange?: () => void;
-  /** The review stage's CTA is the funding pair rendered below the card, so
-   * the inline start button hides there. Default true keeps it for other
-   * call sites. */
-  readonly showStart?: boolean;
-};
-
-export function ReviewCard({
-  householdName,
-  membersCount,
-  budgetAmount,
-  totalAvailable,
-  onStart,
-  onChange,
-  showStart = true,
-}: ReviewCardProps) {
-  const colors = useColors();
-  return (
-    <View style={[styles.toolCard, { backgroundColor: colors.raised, borderColor: colors.lineStrong }]}>
-      <View style={styles.eyebrow}>
-        <Ionicons name="shield-checkmark-outline" size={14} color={colors.mintInk} />
-        <AppText variant="label" tone={colors.mintInk}>
-          Your household
-        </AppText>
-      </View>
-      <AppText variant="cardTitle">{householdName}</AppText>
-      <View style={[styles.factList, { borderTopColor: colors.line }]}>
-        <FactRow label="Members" value={membersCount === 1 ? 'Just you' : `${membersCount} members`} />
-        <FactRow label="Monthly budget" value={formatMoneyINR(budgetAmount)} />
-        <FactRow label="Total available" value={formatMoneyINR(totalAvailable)} />
-      </View>
-      {showStart ? <PrimaryButton label="Start using FastCards" onPress={onStart} /> : null}
-      {onChange ? <TextButton label="Change budget" onPress={onChange} /> : null}
-    </View>
-  );
-}
-
-function FactRow({ label, value }: { label: string; value: string }) {
-  const colors = useColors();
-  return (
-    <View style={styles.factRow}>
-      <AppText variant="secondary" tone={colors.textTertiary}>
-        {label}
-      </AppText>
-      <AppText variant="secondary" tone={colors.textPrimary} tabular style={styles.factValue}>
-        {value}
-      </AppText>
-    </View>
-  );
-}
-
 // ── TypingIndicator — three dots pulsing left to right ────────────────────
 
 const DOT_SIZE = 5;
@@ -511,6 +449,7 @@ export function FundingReceiveCard({
   const { headers } = useAuth();
   const { refresh } = useDomain();
   const colors = useColors();
+  const { formatMoney } = useMoney();
   const [intent, setIntent] = useState<DepositIntent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -650,7 +589,7 @@ export function FundingReceiveCard({
             Rate
           </AppText>
           <AppText variant="secondary" tabular>
-            ₹{intent.rateInrPerUnit} per {intent.asset}
+            {formatMoney(intent.rateInrPerUnit)} per {intent.asset}
           </AppText>
         </View>
       </View>

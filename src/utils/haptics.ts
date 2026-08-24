@@ -1,10 +1,11 @@
 import * as Haptics from 'expo-haptics';
-import { Platform, Vibration } from 'react-native';
 
 /**
- * Haptic wrapper (AI_CHAT_UI_UX_SPEC §16.4). iOS uses expo-haptics; Android
- * falls back to Vibration patterns. Everything is wrapped in a swallow-all so a
- * haptic failure can never take down a gesture or generation flow.
+ * Haptic wrapper (AI_CHAT_UI_UX_SPEC §16.4). Both platforms use expo-haptics —
+ * Android drives the system haptics engine with amplitude control, which reads
+ * as the same premium, subtle feel as iOS instead of raw vibration patterns.
+ * Everything is wrapped in a swallow-all so a haptic failure can never take
+ * down a gesture or generation flow.
  */
 
 function runHaptic(fn: () => Promise<void> | void) {
@@ -17,41 +18,26 @@ function runHaptic(fn: () => Promise<void> | void) {
   }
 }
 
-function vibrate(pattern: number | number[]) {
-  if (Platform.OS === 'android') runHaptic(() => Vibration.vibrate(pattern));
-}
-
 export const haptics = {
   tap() {
-    if (Platform.OS === 'ios') runHaptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
-    else vibrate(8);
+    runHaptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
   },
   select() {
-    if (Platform.OS === 'ios') runHaptic(() => Haptics.selectionAsync());
-    else vibrate(8);
+    runHaptic(() => Haptics.selectionAsync());
   },
   confirm() {
-    if (Platform.OS === 'ios') runHaptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
-    else vibrate(12);
+    runHaptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
   },
   success() {
-    if (Platform.OS === 'ios')
-      runHaptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
-    else vibrate(10);
+    runHaptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
   },
   warning() {
-    if (Platform.OS === 'ios')
-      runHaptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning));
-    else vibrate([0, 10, 40, 10]);
+    runHaptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning));
   },
   error() {
-    if (Platform.OS === 'ios')
-      runHaptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error));
-    else vibrate([0, 15, 30, 15, 30, 15]);
+    runHaptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error));
   },
 };
 
 export const hapticTap = () => haptics.tap();
-export const hapticSelect = () => haptics.select();
-export const hapticConfirm = () => haptics.confirm();
 export const hapticSuccess = () => haptics.success();

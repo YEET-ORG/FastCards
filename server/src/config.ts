@@ -43,9 +43,9 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(8787),
 
   // SpacetimeDB — the system of record. Local instance by default; the
-  // production database lives on maincloud (fastcards-357rw).
+  // production database lives on maincloud (kami-357rw).
   STDB_URI: z.string().default('ws://127.0.0.1:3000'),
-  STDB_DB: z.string().default('fastcards'),
+  STDB_DB: z.string().default('kami'),
   /** Auth token for the gateway identity (the database owner). Falls
    * back to the spacetime CLI's saved login. */
   STDB_TOKEN: z.string().optional(),

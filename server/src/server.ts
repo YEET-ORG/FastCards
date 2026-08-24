@@ -103,7 +103,7 @@ if (isMain) {
         auth: config.privyEnabled ? 'privy' : 'dev',
         agent: config.QWEN_BASE_URL ? 'qwen' : 'scripted',
       },
-      'fastcards-server up',
+      'kami-server up',
     );
   } catch (err) {
     app.log.error(err);

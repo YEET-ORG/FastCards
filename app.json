@@ -1,19 +1,19 @@
 {
   "expo": {
-    "name": "FastCards",
-    "slug": "FastCards",
+    "name": "Kami",
+    "slug": "kami",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "fastcards",
+    "scheme": "kami",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#F7F8FA",
     "ios": {
-      "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.fastcards.app"
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.kami.app"
     },
     "android": {
-      "package": "com.fastcards.app",
+      "package": "com.kami.app",
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -32,7 +32,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow FastCards to scan payment QR codes",
+          "cameraPermission": "Allow Kami to scan payment QR codes",
           "barcodeScannerEnabled": true
         }
       ],

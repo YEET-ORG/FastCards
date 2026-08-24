@@ -258,7 +258,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
           // Network/server trouble: keep the Privy session, surface a
           // retryable error. The refresh interval keeps trying too.
           setPrivyError(
-            e instanceof Error && e.message ? e.message : 'Could not reach the FastCards server.',
+            e instanceof Error && e.message ? e.message : 'Could not reach the Kami server.',
           );
         }
       } finally {

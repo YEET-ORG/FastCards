@@ -100,21 +100,7 @@ export const Deposits = __t.object("Deposits", {
 });
 export type Deposits = __Infer<typeof Deposits>;
 
-export const Household = __t.object("Household", {
-  id: __t.string(),
-  name: __t.string(),
-  budgetCap: __t.i32(),
-  budgetSpent: __t.i32(),
-});
-export type Household = __Infer<typeof Household>;
 
-export const Idempotency = __t.object("Idempotency", {
-  key: __t.string(),
-  actionId: __t.string(),
-  receiptJson: __t.string(),
-  createdAt: __t.string(),
-});
-export type Idempotency = __Infer<typeof Idempotency>;
 
 export const Invites = __t.object("Invites", {
   code: __t.string(),
@@ -150,11 +136,6 @@ export const Members = __t.object("Members", {
 });
 export type Members = __Infer<typeof Members>;
 
-export const ModuleConfig = __t.object("ModuleConfig", {
-  id: __t.u32(),
-  owner: __t.identity(),
-});
-export type ModuleConfig = __Infer<typeof ModuleConfig>;
 
 export const Pool = __t.object("Pool", {
   id: __t.string(),
@@ -196,11 +177,6 @@ export const ProviderPool = __t.object("ProviderPool", {
 });
 export type ProviderPool = __Infer<typeof ProviderPool>;
 
-export const SyncState = __t.object("SyncState", {
-  k: __t.string(),
-  v: __t.string(),
-});
-export type SyncState = __Infer<typeof SyncState>;
 
 export const Transactions = __t.object("Transactions", {
   id: __t.string(),

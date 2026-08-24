@@ -4,7 +4,7 @@
 
 Document purpose: Source-of-truth product and design brief for Claude Code and the implementation team.
 Status: Product definition / pre-build specification.
-Working product name: TBD (repo name: FastCards).
+Working product name: Kami (repo name: Kami).
 Primary client: Mobile app, iOS and Android.
 Primary visual direction: Dark, minimal, premium, high-trust fintech.
 Primary interaction model: AI-first, with deterministic visual controls for money actions.

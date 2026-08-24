@@ -10,8 +10,8 @@ export const onboardingCopy = {
   // can resolve without a name, and "Hi  —" is worse than no name at all.
   greeting: (name: string) =>
     name
-      ? `Hi ${name} — welcome to FastCards. Want to order your first card, add a family member, or take a quick tour?`
-      : 'Welcome to FastCards. Want to order your first card, add a family member, or take a quick tour?',
+      ? `Hi ${name} — welcome to Kami. Want to order your first card, add a family member, or take a quick tour?`
+      : 'Welcome to Kami. Want to order your first card, add a family member, or take a quick tour?',
   welcomeAgain: (name: string) =>
     `No problem${name ? `, ${name}` : ''} — what's next?`,
 
@@ -27,10 +27,10 @@ export const onboardingCopy = {
   explainerFamily:
     "Everyone gets their own card, budget and approvals. Open Family and tap Add member whenever you're ready.",
   explainerTour:
-    'FastCards runs on one pot of money — personal and family balances on Home, with Cards, Family and Activity alongside it, and the + button handles everything else in plain language.',
+    'Kami runs on one pot of money — personal and family balances on Home, with Cards, Family and Activity alongside it, and the + button handles everything else in plain language.',
 
   explainerPills: {
-    'order-card': { label: 'Your card is one tap away', meta: 'CARDS' },
+    'order-card': { label: 'Your card is one tap away', meta: undefined },
     'invite-family': { label: 'Members get their own cards & limits', meta: 'FAMILY' },
     tour: { label: 'Ask is your command center', meta: 'ASK' },
   } as const,

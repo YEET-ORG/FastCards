@@ -5,7 +5,7 @@ import { Appearance, AccessibilityInfo } from 'react-native';
 
 import { depth, palettes, type ColorTokens, type DepthLevel, type ThemeName } from './tokens';
 
-const STORE_KEY = 'fastcards.appearance.mode';
+const STORE_KEY = 'kami.appearance.mode';
 
 /** The mode a fresh install boots into. */
 const DEFAULT_MODE: ThemeName = 'white';

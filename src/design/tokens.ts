@@ -321,9 +321,6 @@ export const black: ColorTokens = withAliases({
 
 export const palettes: Record<ThemeName, ColorTokens> = { white, black };
 
-/** Static default = White, including aliases. Black needs useColors(). */
-export const color = white;
-
 export const space = {
   xs: 4,
   s: 8,
@@ -367,12 +364,6 @@ export const font = {
   medium: 'PlusJakartaSans_500Medium',
   semibold: 'PlusJakartaSans_600SemiBold',
   bold: 'PlusJakartaSans_700Bold',
-} as const;
-
-export const duration = {
-  state: 180,
-  nav: 240,
-  sheet: 280,
 } as const;
 
 /**
@@ -431,4 +422,3 @@ export const depth: Record<ThemeName, Record<DepthLevel, string>> = {
 export const icon = { default: 21, meta: 17, tab: 22 } as const;
 
 export const spring = { damping: 22, stiffness: 280, mass: 0.8 };
-export const springSheet = { damping: 26, stiffness: 240, mass: 0.9 };

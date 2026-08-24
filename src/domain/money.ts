@@ -28,12 +28,6 @@ export function formatMoneyINR(amount: number): string {
   return inrWhole.format(amount);
 }
 
-/** Signed amount for transaction contexts: debit "−₹640", credit "+₹41". */
-export function formatSignedINR(amount: number, direction: 'debit' | 'credit'): string {
-  const base = inrWhole.format(Math.abs(amount));
-  return direction === 'credit' ? `+${base}` : `−${base}`;
-}
-
 /** Relative time for feed rows (spec §49); exact dates belong on detail screens. */
 export function relativeTime(iso: string, now: Date = new Date()): string {
   const then = new Date(iso);

@@ -90,7 +90,7 @@ export class KripiCardProvider implements CardProvider {
 
   async issueCard(input: IssueCardInput): Promise<{ providerCardId: string; last4?: string }> {
     if (input.amountUsd < 10) throw new ProviderError('KripiCard minimum initial load is $10.');
-    const name = [input.firstName, input.lastName].filter(Boolean).join(' ').trim() || 'FastCards Member';
+    const name = [input.firstName, input.lastName].filter(Boolean).join(' ').trim() || 'Kami Member';
     const json = await this.post('/api/external/cards/createcard', {
       bin: this.bin,
       amount: input.amountUsd,

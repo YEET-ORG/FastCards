@@ -31,7 +31,7 @@ afterAll(() => {
 
 export async function freshApp(verifier: AuthVerifier | null = null) {
   const stdb = await getTestStdb();
-  await stdb.call((r) => r.devReset({ confirm: 'RESET-FASTCARDS' }));
+  await stdb.call((r) => r.devReset({ confirm: 'RESET-KAMI' }));
   const provider = new MockCardProvider();
   const { app } = await buildApp({ stdb, provider, verifier });
   return { app, stdb, provider };

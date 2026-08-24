@@ -13,7 +13,7 @@ import type { StoredCard } from '@/store/chatStore';
 
 /**
  * Domain card bodies (AI_CHAT_UI_UX_SPEC §12.2 — the registry shape carries
- * over; the bodies are FastCards-specific). The confirm lifecycle is ONE
+ * over; the bodies are Kami-specific). The confirm lifecycle is ONE
  * morphing card: pending → processing → confirmed | failed | cancelled, patched
  * in place (§12.7). Execution still goes through the trusted gateway
  * (ConfirmSheet with biometry step-up → api.executeAction).

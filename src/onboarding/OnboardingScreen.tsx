@@ -3,9 +3,9 @@
 // household data, and the budget step writes through the app's
 // PREPARE→EXECUTE gateway (domain/store.tsx).
 
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 
 import { useAuth } from '@/auth/AuthContext';
 import { useHeroBalance } from '@/components/fin/useHeroBalance';
@@ -32,6 +32,13 @@ export function OnboardingScreen({ onComplete }: Props) {
   // in prepareAction); everyone else skips that step rather than hitting a
   // permission error they have no way to satisfy.
   const canSetBudget = session?.role === 'owner' || session?.role === 'admin';
+
+  // Sign-in leaves its focused input's keyboard up when the Gate swaps to
+  // onboarding. The composer is not auto-focused, so close the leftover
+  // keyboard on mount — it only opens again when the input is tapped.
+  useEffect(() => {
+    Keyboard.dismiss();
+  }, []);
 
   // Throwing variant on purpose: the flow prints "Your monthly budget is
   // set." on resolve, so a failed write must reject and roll the step back

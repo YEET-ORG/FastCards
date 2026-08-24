@@ -1,8 +1,8 @@
 {
-  "name": "fastcards-module",
+  "name": "kami-module",
   "version": "0.1.0",
   "private": true,
-  "description": "FastCards SpacetimeDB module — system of record for all domain state",
+  "description": "Kami SpacetimeDB module — system of record for all domain state",
   "scripts": {
     "build": "spacetime build",
     "typecheck": "tsc --noEmit"

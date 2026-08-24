@@ -687,6 +687,9 @@ export function ChatSurface({
                 { key: 'balance', icon: 'wallet-outline', label: "What's my balance?", onPress: () => handleCommandSend("What's my balance?") },
                 { key: 'freeze', icon: 'snow-outline', label: 'Freeze Dad’s card', onPress: () => handleCommandSend('Freeze Dad’s card') },
                 { key: 'allowance', icon: 'gift-outline', label: 'Give Maya ₹1,000 more', caption: 'Until Sunday', onPress: () => handleCommandSend('Give Maya ₹1,000 more until Sunday') },
+                { key: 'swiggy', icon: 'restaurant-outline', label: 'Order on Swiggy', caption: 'Food delivery', onPress: () => handleCommandSend('Order dinner on Swiggy') },
+                { key: 'zomato', icon: 'fast-food-outline', label: 'Order on Zomato', caption: 'Food delivery', onPress: () => handleCommandSend('Order lunch on Zomato') },
+                { key: 'blinkit', icon: 'basket-outline', label: 'Order on Blinkit', caption: 'Groceries', onPress: () => handleCommandSend('Order groceries on Blinkit') },
                 { key: 'approvals', icon: 'hand-left-outline', label: 'Review approvals', onPress: () => router.push('/approvals') },
               ]}
               onDismiss={() => setActionMenuOpen(false)}

@@ -44,7 +44,7 @@ interface SavedRecipient {
   at: string;
 }
 
-const RECIPIENTS_KEY = 'fastcards.payments.recipients.v1';
+const RECIPIENTS_KEY = 'kami.payments.recipients.v1';
 const RECIPIENTS_MAX = 8;
 
 async function loadRecipients(): Promise<SavedRecipient[]> {

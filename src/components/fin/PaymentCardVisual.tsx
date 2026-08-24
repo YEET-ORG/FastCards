@@ -105,7 +105,7 @@ function SkiaFrozenFace({ artId, width, height, cream }: { artId: keyof typeof C
  * that rounds the corners must NOT be the one carrying the drop shadow
  * (`overflow: hidden` on a shadowed view drops the shadow on Android).
  */
-export function CardFace({ card, width, height }: { card: Card; width: number; height: number }) {
+function CardFace({ card, width, height }: { card: Card; width: number; height: number }) {
   const colors = useColors();
   const artId = artIdForCard(card);
   const frozenOrClosed = card.status === 'frozen' || card.status === 'closed';

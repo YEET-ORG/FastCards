@@ -10,8 +10,8 @@ import { BalanceCard, type BalanceScope } from '@/components/fin/BalanceCard';
 import type { HeroBalance } from '@/components/fin/useHeroBalance';
 import { PrimaryButton, SecondaryButton } from '@/components/fin/Buttons';
 import { useColors } from '@/design/theme';
+import { useMoney } from '@/domain/currency';
 import { space } from '@/design/tokens';
-import { formatMoneyINR } from '@/domain/money';
 
 import { onboardingCopy } from './copy';
 import { onboardingCardEnter, onboardingMotion } from './motion';
@@ -75,6 +75,7 @@ export function StageInline({
   onFundNow,
 }: StageInlineProps) {
   const colors = useColors();
+  const { formatMoney } = useMoney();
   // Presentation-only: the funding step shows either the funding pair or the
   // receive card. The stage machine is untouched.
   const [receiving, setReceiving] = useState(false);
@@ -82,7 +83,7 @@ export function StageInline({
 
   if (stage.kind === 'welcome') {
     return (
-      <View style={{ rowGap: space.l, marginTop: space.s, width: '100%' }}>
+      <View style={{ rowGap: space.l, width: '100%' }}>
         <StaggeredCard delay={0}>
           <OptionCard
             icon="card-outline"
@@ -150,7 +151,7 @@ export function StageInline({
               icon={index === 0 ? 'wallet-outline' : index === 1 ? 'flash-outline' : 'diamond-outline'}
               onPress={() => onBudgetAmount(option.amount)}
               subtitle={option.label}
-              title={formatMoneyINR(option.amount)}
+              title={formatMoney(option.amount)}
               variant={index === 1 ? 'primary' : index === 2 ? 'accent' : 'default'}
             />
           </StaggeredCard>

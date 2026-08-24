@@ -11,7 +11,7 @@ export function RestoringScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.bg }]}>
       <AppText variant="label" tone={colors.accentInk}>
-        FASTCARDS
+        KAMI
       </AppText>
       <ActivityIndicator color={colors.accent} />
       <AppText variant="secondary" tone={colors.textTertiary}>

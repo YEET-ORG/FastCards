@@ -1,4 +1,4 @@
-# FastCards
+# Kami
 
 AI-native family crypto neobank — Expo (React Native) app + Fastify gateway
 over SpacetimeDB. Package manager is **Bun** throughout (app, gateway,
@@ -30,7 +30,7 @@ spacetime start          # local SpacetimeDB, listens on ws://127.0.0.1:3000
 Publish the module once per database:
 
 ```bash
-bun run --cwd server stdb:publish:local   # database: fastcards
+bun run --cwd server stdb:publish:local   # database: kami
 ```
 
 Then run the gateway:

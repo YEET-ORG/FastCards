@@ -13,8 +13,8 @@ import { Composer } from '@/components/ask/Composer';
 import type { HeroBalance } from '@/components/fin/useHeroBalance';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
+import { useMoney } from '@/domain/currency';
 import { font, screenPad, space } from '@/design/tokens';
-import { formatMoneyINR } from '@/domain/money';
 
 import { ScrollToBottomPill, TypingIndicator } from './cards';
 import { onboardingCopy } from './copy';
@@ -47,6 +47,10 @@ type Props = {
   readonly onComplete: () => void;
 };
 
+/** The thread column's cap on wide screens (tablets, landscape phones) —
+ * centred so the cards never stretch edge-to-edge, chat-column width. */
+const THREAD_MAX_WIDTH = 640;
+
 let eventCounter = 0;
 function makeEventId(prefix: string): string {
   eventCounter += 1;
@@ -72,7 +76,8 @@ export const OnboardingFlow = memo(function OnboardingFlow({
 }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { height: viewportHeight } = useWindowDimensions();
+  const { formatMoney } = useMoney();
+  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
 
   const [stage, setStage] = useState<Stage>({ kind: 'welcome' });
   const [greetId] = useState(() => makeEventId('greet'));
@@ -221,7 +226,7 @@ export const OnboardingFlow = memo(function OnboardingFlow({
     setBusy(true);
     setError(null);
     appendEvents(
-      { kind: 'user', id: makeEventId('u'), label: formatMoneyINR(amount) },
+      { kind: 'user', id: makeEventId('u'), label: formatMoney(amount) },
       {
         kind: 'assistant',
         id: makeEventId('working'),
@@ -386,8 +391,15 @@ export const OnboardingFlow = memo(function OnboardingFlow({
     scrollMetrics.current.contentHeight = h;
   };
 
+  // Responsive column: phones keep full width; wide screens centre a capped
+  // thread so the cards never stretch edge-to-edge.
+  const threadSidePad =
+    viewportWidth > THREAD_MAX_WIDTH + screenPad * 2
+      ? (viewportWidth - THREAD_MAX_WIDTH) / 2
+      : screenPad;
+
   const initialThreadTopPadding = Math.round(
-    Math.min(56, Math.max(28, viewportHeight * 0.045)),
+    Math.min(20, Math.max(8, viewportHeight * 0.012)),
   );
 
   return (
@@ -398,7 +410,10 @@ export const OnboardingFlow = memo(function OnboardingFlow({
         bounces={false}
         contentContainerStyle={[
           styles.thread,
-          { paddingTop: threadStarted ? space.l : initialThreadTopPadding },
+          {
+            paddingTop: threadStarted ? space.l : initialThreadTopPadding,
+            paddingHorizontal: threadSidePad,
+          },
         ]}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
@@ -406,6 +421,7 @@ export const OnboardingFlow = memo(function OnboardingFlow({
         onScroll={handleOnboardingScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}>
+        <View style={styles.threadColumn}>
         {threadStarted ? (
           <Animated.View
             entering={FadeIn.duration(onboardingMotion.headerEnterMs)}
@@ -486,6 +502,7 @@ export const OnboardingFlow = memo(function OnboardingFlow({
             </View>
           </Animated.View>
         ) : null}
+        </View>
       </ScrollView>
 
       <ScrollToBottomPill
@@ -494,13 +511,19 @@ export const OnboardingFlow = memo(function OnboardingFlow({
         bottomOffset={insets.bottom + 120}
       />
 
-      <View style={[styles.composerWrap, { paddingBottom: insets.bottom + space.m }]}>
-        <Composer
-          onSubmit={handlePromptSend}
-          placeholder={resolveOnboardingPlaceholder(stage)}
-          keyboardLift
-          focusSignal={composerFocusSignal}
-        />
+      <View
+        style={[
+          styles.composerWrap,
+          { paddingBottom: insets.bottom + space.m, paddingHorizontal: threadSidePad },
+        ]}>
+        <View style={styles.composerColumn}>
+          <Composer
+            onSubmit={handlePromptSend}
+            placeholder={resolveOnboardingPlaceholder(stage)}
+            keyboardLift
+            focusSignal={composerFocusSignal}
+          />
+        </View>
       </View>
     </View>
   );
@@ -509,10 +532,22 @@ export const OnboardingFlow = memo(function OnboardingFlow({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   thread: {
-    paddingHorizontal: screenPad,
     paddingBottom: space.xl,
+  },
+  /** Centred capped column — phones render it at full width, wide screens
+   * at `THREAD_MAX_WIDTH`; `gap` lives here so the padding and the column
+   * stay independent. */
+  threadColumn: {
+    width: '100%',
+    maxWidth: THREAD_MAX_WIDTH,
+    alignSelf: 'center',
     // The AI chat thread's message gap.
     gap: 14,
+  },
+  composerColumn: {
+    width: '100%',
+    maxWidth: THREAD_MAX_WIDTH,
+    alignSelf: 'center',
   },
   assistantBlock: {
     gap: 10,
@@ -540,7 +575,6 @@ const styles = StyleSheet.create({
     paddingVertical: space.s,
   },
   composerWrap: {
-    paddingHorizontal: screenPad,
     paddingTop: space.s,
   },
 });

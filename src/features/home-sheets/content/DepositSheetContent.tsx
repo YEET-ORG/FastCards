@@ -44,7 +44,7 @@ interface Intent {
 // network never move, and only the rate does. Paying a network round trip on
 // every open to re-fetch that is what made this screen feel slow, so it is
 // cached and revalidated in the background instead.
-const INTENT_KEY = 'fastcards.deposit.intent';
+const INTENT_KEY = 'kami.deposit.intent';
 
 function isIntent(v: unknown): v is Intent {
   if (typeof v !== 'object' || v === null) return false;

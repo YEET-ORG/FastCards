@@ -150,24 +150,7 @@ export const AiHeader = {
   actionButtonSize: 40,
 } as const;
 
-/**
- * Composer tokens. §4.3 — most of `AiComposer` is legacy: the live composer
- * uses COMMAND_BAR_HEIGHT (60) and the 56pt FAB, not these values. Only
- * `horizontalMargin` (16) is still read, by the floating status bar.
- */
-export const AiComposer = {
-  minHeight: 52,
-  maxInputHeight: 120,
-  horizontalMargin: 16,
-  bottomMargin: 12,
-  innerPaddingH: 16,
-  innerPaddingV: 12,
-  borderRadius: 26,
-  sendButtonSize: 40,
-  gap: 10,
-} as const;
-
-/** Font faces the chat uses (FastCards: Plus Jakarta Sans + platform mono). */
+/** Font faces the chat uses (Kami: Plus Jakarta Sans + platform mono). */
 export const ChatFonts = {
   regular: font.regular,
   medium: font.medium,
@@ -175,8 +158,6 @@ export const ChatFonts = {
   bold: font.bold,
   mono: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
 } as const;
-
-export const Radii = { full: 999, nav: 32, card: 16, rounded: 20 } as const;
 
 export const IconSize = { xs: 12, sm: 16, md: 20, lg: 24, xl: 28 } as const;
 

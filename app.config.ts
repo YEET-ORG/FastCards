@@ -21,7 +21,7 @@ function devLanHosts(): string[] {
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: config.name ?? 'FastCards',
-  slug: config.slug ?? 'FastCards',
+  name: config.name ?? 'Kami',
+  slug: config.slug ?? 'kami',
   extra: { ...config.extra, devLanHosts: devLanHosts() },
 });

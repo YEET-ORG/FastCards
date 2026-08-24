@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { memo, useRef } from 'react';
 import { Pressable, StyleSheet, View, type GestureResponderEvent } from 'react-native';
 
@@ -18,6 +19,22 @@ const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
   Groceries: 'cart-outline',
   Health: 'medkit-outline',
   Deposit: 'arrow-down-circle-outline',
+};
+
+/** Branded logos for known merchants — bundled PNGs in the row's icon circle.
+ * Unknown merchants keep the category icon. */
+type MerchantBrand = { logo: number };
+
+const MERCHANT_BRANDS: Record<string, MerchantBrand> = {
+  Swiggy: { logo: require('../../../assets/merchants/swiggy.png') },
+  Zomato: { logo: require('../../../assets/merchants/zomato.png') },
+  Amazon: { logo: require('../../../assets/merchants/amazon.png') },
+  Netflix: { logo: require('../../../assets/merchants/netflix.png') },
+  'BMTC Transit': { logo: require('../../../assets/merchants/bmtc.png') },
+  Blinkit: { logo: require('../../../assets/merchants/blinkit.png') },
+  Steam: { logo: require('../../../assets/merchants/steam.png') },
+  Zara: { logo: require('../../../assets/merchants/zara.png') },
+  Nike: { logo: require('../../../assets/merchants/nike.png') },
 };
 
 export const TransactionRow = memo(function TransactionRow({
@@ -82,13 +99,28 @@ export const TransactionRow = memo(function TransactionRow({
         // state leans on depth; on Black the `inset` fill does the work.
         pressed && { backgroundColor: colors.inset, boxShadow: pressShade },
       ]}>
-      <View style={[styles.icon, { backgroundColor: colors.raised, boxShadow: iconShade }]}>
-        <Ionicons
-          name={categoryIcons[txn.category] ?? 'card-outline'}
-          size={icon.meta}
-          color={declined ? colors.textTertiary : colors.iconPrimary}
-        />
-      </View>
+      {(() => {
+        const brand = MERCHANT_BRANDS[txn.merchant];
+        if (brand) {
+          return (
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              style={[styles.icon, styles.brandIcon, { backgroundColor: colors.raised, boxShadow: iconShade }]}>
+              <Image source={brand.logo} style={styles.brandLogo} contentFit="contain" />
+            </View>
+          );
+        }
+        return (
+          <View style={[styles.icon, { backgroundColor: colors.raised, boxShadow: iconShade }]}>
+            <Ionicons
+              name={categoryIcons[txn.category] ?? 'card-outline'}
+              size={icon.meta}
+              color={declined ? colors.textTertiary : colors.iconPrimary}
+            />
+          </View>
+        );
+      })()}
       <View style={styles.center}>
         <AppText variant="body" numberOfLines={1} tone={declined ? colors.textSecondary : undefined}>
           {txn.merchant}
@@ -137,6 +169,14 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  /** The logo tile — a square mark clipped to the row's circle. */
+  brandIcon: {
+    overflow: 'hidden',
+  },
+  brandLogo: {
+    width: 28,
+    height: 28,
   },
   center: {
     flex: 1,

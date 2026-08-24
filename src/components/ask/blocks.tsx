@@ -1,15 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api, type Receipt, type ServerPreparedAction } from '@/api/client';
-import { useAuth } from '@/auth/AuthContext';
-import { PrimaryButton, TextButton } from '@/components/fin/Buttons';
-import { ConfirmSheet } from '@/components/fin/ConfirmSheet';
 import { AppText } from '@/design/AppText';
 import { useColors } from '@/design/theme';
-import { font, space } from '@/design/tokens';
-import LoadingState from '@/shared/ui/ai/thinking-state';
+import { space } from '@/design/tokens';
 
 export function UserBubble({ text }: { text: string }) {
   const colors = useColors();
@@ -30,183 +23,11 @@ export function UserBubble({ text }: { text: string }) {
   );
 }
 
-export function AssistantText({ text, degraded }: { text: string; degraded?: boolean }) {
-  const colors = useColors();
-  return (
-    <View style={{ gap: 4, maxWidth: '92%' }}>
-      <AppText variant="body" tone={colors.textSecondary}>
-        {text}
-      </AppText>
-      {degraded ? (
-        <AppText variant="caption" tone={colors.warningInk}>
-          AI is temporarily limited — answered with basic commands.
-        </AppText>
-      ) : null}
-    </View>
-  );
-}
-
-export function ThinkingIndicator() {
-  const colors = useColors();
-  return (
-    <View style={styles.thinking}>
-      <Ionicons name="sparkles-outline" size={13} color={colors.mintInk} style={{ marginTop: 4 }} />
-      <LoadingState
-        lines={['Checking balances…', 'Reading household rules…', 'Preparing a safe answer…']}
-        visibleLines={2}
-        lineHeight={20}
-        scrollSpeed={900}
-        showLineNumbers={false}
-        containerStyle={{ height: 44, flex: 1 }}
-        lineTextStyle={{ color: colors.textTertiary, fontSize: 13, fontFamily: font.regular }}
-        gradientColors={[colors.bg, 'transparent']}
-      />
-    </View>
-  );
-}
-
-export function ServerProposalBlock({
-  action,
-  status,
-  onExecuted,
-  onCancelled,
-}: {
-  action: ServerPreparedAction;
-  status: 'pending' | 'executed' | 'cancelled' | 'failed';
-  onExecuted: (receipt: Receipt) => void;
-  onCancelled: () => void;
-}) {
-  const { headers } = useAuth();
-  const colors = useColors();
-  const [confirming, setConfirming] = useState(false);
-
-  return (
-    <View
-      style={[
-        styles.toolCard,
-        { backgroundColor: colors.raised, borderColor: colors.lineStrong },
-      ]}>
-      <View style={styles.eyebrow}>
-        <Ionicons name="create-outline" size={13} color={colors.warningInk} />
-        <AppText variant="label" tone={colors.warningInk}>
-          Proposed change
-        </AppText>
-      </View>
-      <AppText variant="cardTitle">{action.subject}</AppText>
-      <View style={[styles.factList, { borderTopColor: colors.line }]}>
-        {action.facts.map((f) => (
-          <View key={f.label} style={styles.factRow}>
-            <AppText variant="secondary" tone={colors.textTertiary}>
-              {f.label}
-            </AppText>
-            <AppText variant="secondary" tabular style={{ flexShrink: 1, textAlign: 'right' }}>
-              {f.value}
-            </AppText>
-          </View>
-        ))}
-      </View>
-
-      {status === 'pending' ? (
-        <View style={styles.proposalActions}>
-          <PrimaryButton label="Review & apply" onPress={() => setConfirming(true)} style={{ flex: 1, minHeight: 50 }} />
-          <TextButton
-            label="Cancel"
-            tone={colors.textSecondary}
-            onPress={() => {
-              void api.cancelAction(headers, action.id).catch(() => {});
-              onCancelled();
-            }}
-          />
-        </View>
-      ) : (
-        <AppText
-          variant="caption"
-          tone={status === 'executed' ? colors.mintInk : status === 'failed' ? colors.errorInk : colors.textTertiary}>
-          {status === 'executed' ? 'Applied' : status === 'failed' ? 'Failed — nothing changed' : 'Cancelled'}
-        </AppText>
-      )}
-
-      <ConfirmSheet
-        visible={confirming}
-        title="Review change"
-        subject={action.subject}
-        facts={action.facts.map((f, i) => ({ ...f, emphasis: i === 0 }))}
-        note={action.note}
-        cta={action.cta}
-        onConfirm={async () => {
-          const receipt = await api.executeAction(headers, action.id, action.factsHash, `app-${action.id}`);
-          onExecuted(receipt);
-        }}
-        onClose={() => setConfirming(false)}
-      />
-    </View>
-  );
-}
-
-export function ReceiptBlock({ receipt }: { receipt: Receipt }) {
-  const colors = useColors();
-  return (
-    <View style={[styles.toolCard, { backgroundColor: colors.cream, borderColor: colors.mintBorder }]}>
-      <View style={styles.eyebrow}>
-        <Ionicons name="checkmark-circle-outline" size={14} color={colors.mintInk} />
-        <AppText variant="label" tone={colors.mintInk}>
-          Done
-        </AppText>
-      </View>
-      <AppText variant="cardTitle">{receipt.title}</AppText>
-      <View style={[styles.factList, { borderTopColor: colors.line }]}>
-        {receipt.rows.map((r) => (
-          <View key={r.label} style={styles.factRow}>
-            <AppText variant="secondary" tone={colors.textTertiary}>
-              {r.label}
-            </AppText>
-            <AppText variant="secondary" tabular>
-              {r.value}
-            </AppText>
-          </View>
-        ))}
-      </View>
-      <AppText variant="caption">{receipt.actor} · recorded in Activity</AppText>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   userBubble: {
     alignSelf: 'flex-end',
     maxWidth: '80%',
     paddingHorizontal: space.l,
     paddingVertical: 12,
-  },
-  thinking: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  toolCard: {
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: space.l,
-    gap: space.m,
-  },
-  eyebrow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  factList: {
-    gap: 7,
-    borderTopWidth: 1,
-    paddingTop: space.m,
-  },
-  factRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: space.m,
-  },
-  proposalActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.l,
   },
 });

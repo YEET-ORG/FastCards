@@ -853,7 +853,7 @@ export function BalanceCard({
                 importantForAccessibility="no"
                 tone={black ? colors.accentBright : colors.accentInk}
                 style={styles.wordmark}>
-                FASTCARD
+                KAMI
               </AppText>
             </View>
           </LinearGradient>

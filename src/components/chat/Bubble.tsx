@@ -2,10 +2,10 @@ import { memo, useCallback, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { aiMessageEnter, AiSpacing, ChatFonts } from '@/constants/ai-ui';
+import { aiMessageEnter, ChatFonts } from '@/constants/ai-ui';
 import { ChatToolCard } from '@/components/chat/ChatToolCard';
 import { MarkdownText } from '@/components/chat/MarkdownText';
-import { AiPulsePlaceholder, AiStreamingCursor } from '@/components/intent/AiPulsePlaceholder';
+import { AiStreamingCursor } from '@/components/intent/AiPulsePlaceholder';
 import { TypingIndicator } from '@/components/intent/TypingIndicator';
 import { useColors } from '@/design/theme';
 import type { StoredMessage } from '@/store/chatStore';
@@ -131,8 +131,6 @@ type Props = React.ComponentProps<typeof BubbleInner>;
 
 export const Bubble = memo(BubbleInner, comparator);
 
-/** Placeholder used by the three-state ladder (exported for reuse). */
-export { AiPulsePlaceholder };
 
 const styles = StyleSheet.create({
   pressable: { borderRadius: 16 },
@@ -154,5 +152,3 @@ const styles = StyleSheet.create({
   thinkText: { fontSize: 12, lineHeight: 16, marginTop: 6, fontFamily: ChatFonts.regular },
   degraded: { fontSize: 12, lineHeight: 16, fontFamily: ChatFonts.regular },
 });
-
-export const bubbleListPaddingH = AiSpacing.conversationPaddingH;

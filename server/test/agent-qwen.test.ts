@@ -15,7 +15,7 @@ delete process.env.AGENT_MODE;
 let db: Stdb;
 beforeEach(async () => {
   db = await getTestStdb();
-  await db.call((r) => r.devReset({ confirm: 'RESET-FASTCARDS' }));
+  await db.call((r) => r.devReset({ confirm: 'RESET-KAMI' }));
 });
 
 type FakeTurn = (body: any) => object; // returns the assistant message

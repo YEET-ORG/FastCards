@@ -1,4 +1,4 @@
-// FastCards domain schema — the system of record. Every table is
+// Kami domain schema — the system of record. Every table is
 // PRIVATE: only the Node gateway (the database owner) can subscribe or
 // mutate. All mutations go through reducers in index.ts, which enforce
 // the PREPARE→EXECUTE invariants transactionally.
