@@ -31,8 +31,8 @@ const TABS: {
 
 const PLACEHOLDERS = [
   'Ask anything…',
-  'How much does Maya have left?',
-  "Freeze Dad’s card",
+  'How much has anyone left this month?',
+  "Freeze a family member’s card",
   'Add ₹1,000 until Sunday',
 ];
 

@@ -38,8 +38,8 @@ type Props = {
   readonly totalAvailable: number;
   /** The hero card the flow finishes on — the same one Home opens with. */
   readonly hero: HeroBalance;
-  /** False for a session that cannot set the household budget (a teen on the
-   * demo build). The budget step is skipped rather than offered and refused. */
+  /** False for a session that cannot set the household budget. The budget
+   * step is skipped rather than offered and refused. */
   readonly canSetBudget: boolean;
   /** The budget already on the household, used when the budget step is skipped. */
   readonly householdBudget: number;

@@ -1,9 +1,6 @@
-// App auth layer. Two modes, same interface:
+// App auth layer. Live only:
 //
-// - Dev: pick a seeded user on the sign-in screen; requests carry
-//   `x-user-id`. Persisted in SecureStore so restarts land back in the
-//   same session. Works against the server's dev mode only.
-// - Privy (live): email-OTP login via @privy-io/expo. Requests carry
+// - Privy: email-OTP login via @privy-io/expo. Requests carry
 //   `Bearer <access token>` (+ `privy-id-token` for wallet sync); the
 //   server resolves the DID to a household user (first login binds the
 //   owner, later ones need an invite). Privy persists its own session,
@@ -33,21 +30,14 @@ export interface AppSession {
   isAdmin: boolean;
 }
 
-export const DEV_USERS: AppSession[] = [
-  { userId: 'u-rohan', name: 'Rohan', role: 'owner', isAdmin: true },
-  { userId: 'u-maya', name: 'Maya', role: 'teen', isAdmin: false },
-];
-
 interface AuthContextValue {
   session: AppSession | null;
   headers: AuthHeaders;
-  /** 'dev' | 'privy' — how the current session authenticates. */
-  mode: 'dev' | 'privy' | null;
-  /** True while a stored session (Privy or dev) is being restored at boot. */
+  /** True while a stored Privy session is being restored at boot. */
   restoring: boolean;
-  /** True from a sign-in the user actually performed — an email OTP login or
-   * a dev-user tap — until onboarding consumes it. False for a session
-   * restored silently at launch, which must not re-run onboarding. */
+  /** True from a sign-in the user actually performed — an email OTP login —
+   * until onboarding consumes it. False for a session restored silently at
+   * launch, which must not re-run onboarding. */
   justSignedIn: boolean;
   /** Called by the onboarding gate once the flow has been completed. */
   clearJustSignedIn: () => void;
@@ -57,28 +47,24 @@ interface AuthContextValue {
   retryPrivy: () => void;
   /** The name typed at registration, held until the server has taken it. */
   setSignUpName: (name: string) => void;
-  signInDev: (userId: string) => void;
   signOut: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const TOKEN_REFRESH_MS = 5 * 60 * 1000;
-const DEV_USER_KEY = 'fc.devUserId';
 const SIGNUP_NAME_KEY = 'fc.signUpName';
 
 export function AuthProvider({ children }: React.PropsWithChildren) {
   const [session, setSession] = useState<AppSession | null>(null);
   const [headers, setHeaders] = useState<AuthHeaders>({});
-  const [mode, setMode] = useState<'dev' | 'privy' | null>(null);
   const [restoring, setRestoring] = useState(true);
   const [privyError, setPrivyError] = useState<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
   // Onboarding is gated on the sign-in *event*, not only on the stored
   // completion flag: the flag is per user id, and the server binds the first
-  // Privy DID to the seeded owner, so registration and the dev owner share
-  // one flag. Without this, the second sign-in on a device would silently
-  // skip the flow. A restored session leaves it false.
+  // Privy DID to the household owner. Without this, the second sign-in on a
+  // device would silently skip the flow. A restored session leaves it false.
   const [justSignedIn, setJustSignedIn] = useState(false);
   // Set when Privy already had a session the moment it became ready — that is
   // a restore, not a login. Cleared on sign-out so the next login counts.
@@ -113,29 +99,9 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     setJustSignedIn(false);
   }, []);
 
-  /** The dev session itself. `interactive` separates a tap on the sign-in
-   * screen from the boot restore below, which replays the same stored id. */
-  const applyDevSession = useCallback((userId: string, opts: { interactive: boolean }) => {
-    const user = DEV_USERS.find((u) => u.userId === userId);
-    if (!user) return;
-    setSession(user);
-    setHeaders({ 'x-user-id': user.userId });
-    setMode('dev');
-    setPrivyError(null);
-    setRestoring(false);
-    if (opts.interactive) setJustSignedIn(true);
-    SecureStore.setItemAsync(DEV_USER_KEY, user.userId).catch(() => undefined);
-  }, []);
-
-  const signInDev = useCallback(
-    (userId: string) => applyDevSession(userId, { interactive: true }),
-    [applyDevSession],
-  );
-
   const signOut = useCallback(() => {
     setSession(null);
     setHeaders({});
-    setMode(null);
     setPrivyError(null);
     setRestoring(false);
     setJustSignedIn(false);
@@ -144,7 +110,6 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     restoredPrivyAtBoot.current = false;
     privySignInRaised.current = false;
     clearSignUpName();
-    SecureStore.deleteItemAsync(DEV_USER_KEY).catch(() => undefined);
     privyLogout().catch(() => undefined);
   }, [privyLogout, clearSignUpName]);
 
@@ -166,8 +131,8 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   }, []);
 
   // Boot restore: wait for Privy to load its stored session. A restored
-  // Privy user takes the exchange path below; otherwise fall back to the
-  // persisted dev session; otherwise show sign-in.
+  // Privy user takes the exchange path below; with no Privy session the
+  // bridge effect below ends the restoring state (sign-in is shown).
   const bootHandled = useRef(false);
   useEffect(() => {
     if (!privyReady || bootHandled.current) return;
@@ -176,23 +141,15 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       // A session that was already there when Privy loaded — a restore, so the
       // exchange below must not treat it as a fresh sign-in.
       restoredPrivyAtBoot.current = true;
-      return; // exchange effect takes over (keeps restoring=true)
     }
-    SecureStore.getItemAsync(DEV_USER_KEY)
-      .then((stored) => {
-        if (stored && DEV_USERS.some((u) => u.userId === stored)) {
-          applyDevSession(stored, { interactive: false });
-        } else setRestoring(false);
-      })
-      .catch(() => setRestoring(false));
-  }, [privyReady, privyUser, applyDevSession]);
+  }, [privyReady, privyUser]);
 
   // Privy bridge: when a Privy user appears (fresh login or restored
   // session), exchange the access token for a server-side session. The
   // server is the source of truth for who this DID is in the household.
   useEffect(() => {
-    if (!privyUser || mode === 'dev') {
-      if (privyReady && !privyUser && mode !== 'dev' && bootHandled.current) setRestoring(false);
+    if (!privyUser) {
+      if (privyReady && bootHandled.current) setRestoring(false);
       return;
     }
     let cancelled = false;
@@ -224,8 +181,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
           if (
             prev &&
             prev.authorization === h.authorization &&
-            prev['privy-id-token'] === h['privy-id-token'] &&
-            prev['x-user-id'] === h['x-user-id']
+            prev['privy-id-token'] === h['privy-id-token']
           ) {
             return prev;
           }
@@ -240,7 +196,6 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
             ? prev
             : { userId: s.userId, name: s.name, role: s.role, isAdmin: s.isAdmin },
         );
-        setMode('privy');
         setPrivyError(null);
         // Raised once, and only for a login the user just performed: a session
         // Privy restored at boot goes to the app on its stored onboarding flag.
@@ -272,33 +227,29 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [privyUser, mode, retryTick, privyReady, getIdentityToken, privyLogout, clearSignUpName]);
+  }, [privyUser, retryTick, privyReady, getIdentityToken, privyLogout, clearSignUpName]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
       headers,
-      mode,
       restoring,
       justSignedIn,
       clearJustSignedIn,
       privyError,
       retryPrivy,
       setSignUpName,
-      signInDev,
       signOut,
     }),
     [
       session,
       headers,
-      mode,
       restoring,
       justSignedIn,
       clearJustSignedIn,
       privyError,
       retryPrivy,
       setSignUpName,
-      signInDev,
       signOut,
     ],
   );

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { memo, type RefObject } from 'react';
 import {
@@ -12,6 +13,7 @@ import {
 import { ScrollView } from 'react-native-gesture-handler';
 
 import { SecondaryButton } from '@/components/fin/Buttons';
+import { MERCHANT_BRANDS } from '@/components/fin/merchantBrands';
 import { StatusBadge } from '@/components/fin/primitives';
 import { Panel } from '@/components/fin/Screen';
 import { AppText } from '@/design/AppText';
@@ -50,21 +52,26 @@ function TransactionDetailInner({
     const member = state.members.find((m) => m.id === txn.memberId);
     const card = state.cards.find((c) => c.id === txn.cardId);
     const declined = txn.status === 'declined';
+    const brand = MERCHANT_BRANDS[txn.merchant];
 
     const meta: { label: string; value: string }[] = [
       { label: 'Date & time', value: exactTime(txn.at) },
       { label: 'Card', value: card ? `${card.nickname} · •••• ${card.last4}` : '—' },
       { label: 'Member', value: member?.name ?? '—' },
       { label: 'Category', value: txn.category },
-      { label: 'Currency', value: 'INR' },
+      { label: 'Currency', value: 'USDT' },
     ];
 
     return (
       <>
         {/* Hero */}
         <View style={styles.hero}>
-          <View style={styles.merchantIcon}>
-            <Ionicons name="storefront-outline" size={22} color={colors.textSecondary} />
+          <View style={[styles.merchantIcon, brand && styles.merchantIconBrand]}>
+            {brand ? (
+              <Image source={brand.logo} style={styles.brandLogo} contentFit="contain" />
+            ) : (
+              <Ionicons name="storefront-outline" size={22} color={colors.textSecondary} />
+            )}
           </View>
           <AppText variant="section">{txn.merchant}</AppText>
           <AppText variant="hero" tabular tone={declined ? colors.textTertiary : undefined}>
@@ -194,6 +201,13 @@ function makeStyles(colors: ColorTokens) {
       borderColor: colors.borderSoft,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    merchantIconBrand: {
+      overflow: 'hidden',
+    },
+    brandLogo: {
+      width: 34,
+      height: 34,
     },
     metaRow: {
       flexDirection: 'row',

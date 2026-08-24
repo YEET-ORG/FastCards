@@ -17,6 +17,7 @@ import { Panel, Screen, ScreenHeader } from '@/components/fin/Screen';
 import { AppText } from '@/design/AppText';
 import { useColors, useTheme } from '@/design/theme';
 import { font, radius, space, type ThemeName } from '@/design/tokens';
+import { useDomain } from '@/domain/store';
 import { AnimatedThemeToggle } from '@/shared/ui/micro-interactions/animated-theme-toggle';
 
 const MODE_LABELS: Record<ThemeName, string> = {
@@ -79,10 +80,14 @@ function ThemeGlyph({
 
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
+  const { state } = useDomain();
   const { mode, toggleMode, reduceMotion } = useTheme();
   const colors = useColors();
   const router = useRouter();
-  const hue = colors.member.rohan;
+  const profileMember = session?.userId
+    ? state.members.find((m) => m.id === session.userId)
+    : undefined;
+  const hue = colors.member[profileMember?.hueId ?? 'custom'];
   const nextLabel = MODE_LABELS[mode === 'black' ? 'white' : 'black'];
 
   return (

@@ -67,8 +67,8 @@ const MAINTAIN_VISIBLE_POSITION = {
 
 const SUGGESTIONS = [
   "What's my balance?",
-  'Freeze Dad’s card',
-  'Give Maya ₹1,000 more until Sunday',
+  'Freeze a family member’s card',
+  'Give a family member more this month',
 ];
 
 /**
@@ -685,8 +685,8 @@ export function ChatSurface({
             <PlusMenu
               items={[
                 { key: 'balance', icon: 'wallet-outline', label: "What's my balance?", onPress: () => handleCommandSend("What's my balance?") },
-                { key: 'freeze', icon: 'snow-outline', label: 'Freeze Dad’s card', onPress: () => handleCommandSend('Freeze Dad’s card') },
-                { key: 'allowance', icon: 'gift-outline', label: 'Give Maya ₹1,000 more', caption: 'Until Sunday', onPress: () => handleCommandSend('Give Maya ₹1,000 more until Sunday') },
+                { key: 'freeze', icon: 'snow-outline', label: 'Freeze a family member’s card', onPress: () => handleCommandSend('Freeze a family member’s card') },
+                { key: 'allowance', icon: 'gift-outline', label: 'Give a family member more', caption: 'Until Sunday', onPress: () => handleCommandSend('Give a family member more this month') },
                 { key: 'swiggy', icon: 'restaurant-outline', label: 'Order on Swiggy', caption: 'Food delivery', onPress: () => handleCommandSend('Order dinner on Swiggy') },
                 { key: 'zomato', icon: 'fast-food-outline', label: 'Order on Zomato', caption: 'Food delivery', onPress: () => handleCommandSend('Order lunch on Zomato') },
                 { key: 'blinkit', icon: 'basket-outline', label: 'Order on Blinkit', caption: 'Groceries', onPress: () => handleCommandSend('Order groceries on Blinkit') },

@@ -11,6 +11,8 @@ import { relativeTime } from '@/domain/money';
 import type { Member, Transaction } from '@/domain/types';
 import type { MorphOrigin } from '@/features/home-sheets/sheetMotion';
 
+import { MERCHANT_BRANDS } from './merchantBrands';
+
 const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
   Food: 'restaurant-outline',
   Transport: 'bus-outline',
@@ -19,22 +21,6 @@ const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
   Groceries: 'cart-outline',
   Health: 'medkit-outline',
   Deposit: 'arrow-down-circle-outline',
-};
-
-/** Branded logos for known merchants — bundled PNGs in the row's icon circle.
- * Unknown merchants keep the category icon. */
-type MerchantBrand = { logo: number };
-
-const MERCHANT_BRANDS: Record<string, MerchantBrand> = {
-  Swiggy: { logo: require('../../../assets/merchants/swiggy.png') },
-  Zomato: { logo: require('../../../assets/merchants/zomato.png') },
-  Amazon: { logo: require('../../../assets/merchants/amazon.png') },
-  Netflix: { logo: require('../../../assets/merchants/netflix.png') },
-  'BMTC Transit': { logo: require('../../../assets/merchants/bmtc.png') },
-  Blinkit: { logo: require('../../../assets/merchants/blinkit.png') },
-  Steam: { logo: require('../../../assets/merchants/steam.png') },
-  Zara: { logo: require('../../../assets/merchants/zara.png') },
-  Nike: { logo: require('../../../assets/merchants/nike.png') },
 };
 
 export const TransactionRow = memo(function TransactionRow({
@@ -84,6 +70,7 @@ export const TransactionRow = memo(function TransactionRow({
     txn.category,
     declined ? null : txn.status === 'pending' ? 'Pending' : null,
   ].filter(Boolean);
+  const subtitle = txn.subtitle ?? subtitleParts.join(' · ');
 
   return (
     <Pressable
@@ -126,7 +113,7 @@ export const TransactionRow = memo(function TransactionRow({
           {txn.merchant}
         </AppText>
         <AppText variant="secondary" tone={colors.textTertiary} numberOfLines={1}>
-          {declined ? (txn.declineReason ?? 'Declined') : subtitleParts.join(' · ')}
+          {declined ? (txn.declineReason ?? 'Declined') : subtitle}
         </AppText>
       </View>
       <View style={styles.right}>

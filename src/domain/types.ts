@@ -81,6 +81,9 @@ export interface Transaction {
   status: TxnStatus;
   declineReason?: string;
   approvedBy?: string; // set when the txn went through a one-time approval
+  /** Row-subtitle override (e.g. "From Visa *6636"). Optional; the server
+   * usually leaves it unset. */
+  subtitle?: string;
   at: string; // ISO
 }
 

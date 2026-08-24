@@ -15,7 +15,7 @@ import { useAskDock } from '@/components/ask/AskDockContext';
 import { PaymentCardVisual } from '@/components/fin/PaymentCardVisual';
 import { ProgressBar, QuickAction, SectionHeader, StatusBadge } from '@/components/fin/primitives';
 import { RollingMoney } from '@/components/fin/RollingMoney';
-import { HeaderIconButton, Screen, ScreenHeader } from '@/components/fin/Screen';
+import { HeaderIconButton, Panel, Screen, ScreenHeader } from '@/components/fin/Screen';
 import { useToast } from '@/components/fin/Toast';
 import { TransactionRow } from '@/components/fin/TransactionRow';
 import { AppText } from '@/design/AppText';
@@ -137,9 +137,12 @@ export default function CardsHub() {
           title="Cards"
           right={<HeaderIconButton icon="add" label="Create card" onPress={() => router.push('/order-card')} />}
         />
-        <AppText variant="secondary" tone={colors.textTertiary}>
-          No cards yet.
-        </AppText>
+        <Panel style={{ gap: space.s }}>
+          <StatusBadge status="pending" label="Card in progress" />
+          <AppText variant="body">
+            Your card is being created and will be ready within 12 hours.
+          </AppText>
+        </Panel>
         <QuickAction icon="add-outline" label="Create card" onPress={() => router.push('/order-card')} />
       </Screen>
     );

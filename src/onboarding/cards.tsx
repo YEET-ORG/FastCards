@@ -460,8 +460,8 @@ export function FundingReceiveCard({
   // Load the deposit intent once (same endpoint the deposit screen uses).
   useEffect(() => {
     let cancelled = false;
-    api
-      .depositIntent(headers)
+    const load = api.depositIntent(headers);
+    load
       .then((next) => {
         if (!cancelled) setIntent(next);
       })
@@ -537,8 +537,8 @@ export function FundingReceiveCard({
           onPress={() => {
             setError(null);
             setIntent(null);
-            void api
-              .depositIntent(headers)
+            const load = api.depositIntent(headers);
+            load
               .then(setIntent)
               .catch((e) =>
                 setError(e instanceof ApiError ? e.message : 'Could not load deposit details.'),

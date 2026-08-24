@@ -162,7 +162,7 @@ const copyStyles = StyleSheet.create({
   mono: { fontFamily: font.medium },
 });
 
-function DepositContentInner({ presentation = 'screen', scrollOffsetOut, scrollRef, openSettled = false }: SheetScreenProps) {
+function DepositContentInner({ presentation = 'screen', scrollOffsetOut, scrollRef }: SheetScreenProps) {
   const { headers, session } = useAuth();
   const userId = session?.userId;
   const { refresh } = useDomain();
@@ -190,8 +190,8 @@ function DepositContentInner({ presentation = 'screen', scrollOffsetOut, scrollR
   // screen had no way to show the failure or to recover from it — a failed
   // load left the loading state up forever.
   const fetchIntent = useCallback(() => {
-    api
-      .depositIntent(headers)
+    const load = api.depositIntent(headers);
+    load
       .then((next) => {
         setIntent(next);
         if (userId) writeCachedIntent(userId, next);
@@ -281,15 +281,7 @@ function DepositContentInner({ presentation = 'screen', scrollOffsetOut, scrollR
       {intent ? (
         <ScrollView {...scrollProps}>
           <View style={styles.qrWrap}>
-            {/* QR matrix generation is the heaviest synchronous mount cost in
-                the sheet; defer it until the open transition settles so the
-                first frame stays light. The placeholder holds the same
-                footprint, so nothing shifts when the QR lands. */}
-            {openSettled ? (
-              <QRCode QRCodevalue={qrValue} />
-            ) : (
-              <View style={styles.qrPlaceholder} />
-            )}
+            <QRCode QRCodevalue={qrValue} />
           </View>
 
           {/* Values only, no labels. The note below the card carries the one
@@ -372,7 +364,6 @@ function makeStyles(colors: ColorTokens) {
     root: { flex: 1, backgroundColor: colors.bg },
     scroll: { paddingHorizontal: screenPad, paddingBottom: 60, gap: space.xl },
     qrWrap: { alignItems: 'center', paddingVertical: space.s },
-    qrPlaceholder: { width: 190, height: 190 },
     centerState: {
       flex: 1,
       alignItems: 'center',

@@ -41,8 +41,9 @@ export function AiActivityNotifier() {
 
     if (kind === 'approval_event' && pending.length > 0) {
       icon = 'hand-left-outline';
-      const mayaRemaining = memberRemaining(state, 'm-maya');
-      statement = `Maya has ${formatMoney(mayaRemaining ?? 0)} left this month. One purchase needs approval.`;
+      const requester = state.members.find((m) => m.id === pending[0].requesterId);
+      const remaining = memberRemaining(state, pending[0].requesterId);
+      statement = `${requester?.name ?? 'A member'} has ${formatMoney(remaining ?? 0)} left this month. One purchase needs approval.`;
       pillSubtitle = undefined;
       actions = [
         { label: 'Review approval', onPress: () => router.push('/approvals') },

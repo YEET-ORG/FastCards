@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useAskDock } from '@/components/ask/AskDockContext';
+import { useAuth } from '@/auth/AuthContext';
 import { HeaderIconButton, Screen, ScreenHeader } from '@/components/fin/Screen';
 import { Segments } from '@/components/fin/Segments';
 import { TransactionRow } from '@/components/fin/TransactionRow';
@@ -34,6 +35,7 @@ const eventIcons: Record<AuditEvent['kind'], keyof typeof Ionicons.glyphMap> = {
 export default function ActivityFeed() {
   const { formatMoney } = useMoney();
   const { state } = useDomain();
+  const { session } = useAuth();
   const router = useRouter();
   const colors = useColors();
   const dock = useAskDock();
@@ -67,8 +69,8 @@ export default function ActivityFeed() {
       if (filter === 'all') return true;
       if (filter === 'ai') return item.type === 'event' && item.event.kind === 'ai_action';
       const memberId = item.type === 'txn' ? item.txn.memberId : item.event.memberId;
-      if (filter === 'mine') return memberId === 'm-rohan';
-      return memberId !== undefined && memberId !== 'm-rohan';
+      if (filter === 'mine') return memberId === session?.userId;
+      return memberId !== undefined && memberId !== session?.userId;
     });
 
     filtered.sort((a, b) => b.at.localeCompare(a.at));
@@ -81,7 +83,7 @@ export default function ActivityFeed() {
       else groups.push({ label, items: [item] });
     }
     return { groups, rowProps };
-  }, [state.transactions, state.events, state.members, filter, router]);
+  }, [state.transactions, state.events, state.members, filter, router, session?.userId]);
 
   return (
     <Screen scrollToTopRef={scrollRef} onScrollDirection={dock.reportScroll}>

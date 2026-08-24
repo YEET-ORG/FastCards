@@ -8,7 +8,7 @@ export const MERCHANT_BRANDS: Record<string, MerchantBrand> = {
   Amazon: { logo: require('../../../assets/merchants/amazon.png') },
   Netflix: { logo: require('../../../assets/merchants/netflix.png') },
   'BMTC Transit': { logo: require('../../../assets/merchants/bmtc.png') },
-  Blinkit: { logo: require('../../../assets/blinkit.png') },
+  Blinkit: { logo: require('../../../assets/merchants/blinkit.png') },
   Steam: { logo: require('../../../assets/merchants/steam.png') },
   Zara: { logo: require('../../../assets/merchants/zara.png') },
   Nike: { logo: require('../../../assets/merchants/nike.png') },

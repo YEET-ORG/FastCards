@@ -9,6 +9,7 @@ import { useAuth } from '@/auth/AuthContext';
 import { BalanceCard } from '@/components/fin/BalanceCard';
 import { useHeroBalance } from '@/components/fin/useHeroBalance';
 import { QuickAction, SectionHeader } from '@/components/fin/primitives';
+import { Panel } from '@/components/fin/Screen';
 import { TransactionRow } from '@/components/fin/TransactionRow';
 import { ChatFirstShell } from '@/features/home/ChatFirstShell';
 import type { ChatDrawerMode } from '@/features/home/useChatDrawer';
@@ -109,7 +110,7 @@ export default function AskHome() {
       })),
     [recent, state.members, sheet],
   );
-  const hue = colors.member[hero.owner?.hueId ?? 'rohan'];
+  const hue = colors.member[hero.owner?.hueId ?? 'custom'];
 
   // Swiping anywhere on the wallet page changes scope, so the gesture lives
   // here rather than on the card. The shell's drawer pan activates at 24px of
@@ -148,6 +149,14 @@ export default function AskHome() {
           </View>
 
           <BalanceCard {...hero.balanceProps} />
+
+          {newUser ? (
+            <Panel style={{ gap: space.s }}>
+              <AppText variant="body">
+                Your card is being created and will be ready within 12 hours.
+              </AppText>
+            </Panel>
+          ) : null}
 
           {newUser ? (
             <View style={styles.quickRow}>

@@ -143,9 +143,11 @@ export function StageInline({
     if (stage.status === 'applied') {
       return <StatusPill label={onboardingCopy.budgetDonePill.label} meta={onboardingCopy.budgetDonePill.meta} tone="success" />;
     }
+    const budgetOptions: readonly { amount: number; label: string }[] =
+      onboardingCopy.budgetAmounts;
     return (
       <View style={{ rowGap: space.l, marginTop: space.s, width: '100%' }}>
-        {onboardingCopy.budgetAmounts.map((option, index) => (
+        {budgetOptions.map((option, index) => (
           <StaggeredCard key={option.amount} delay={onboardingMotion.staggerCardStepMs * index}>
             <OptionCard
               icon={index === 0 ? 'wallet-outline' : index === 1 ? 'flash-outline' : 'diamond-outline'}

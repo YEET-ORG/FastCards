@@ -1,7 +1,6 @@
 // Kami API client — the app's only door to the financial backend.
-// Sends the auth headers provided by the AuthContext (dev: x-user-id;
-// live: Privy bearer token) and maps server rows (snake_case) onto the
-// app's domain types.
+// Sends the Privy bearer-token auth headers provided by the AuthContext and
+// maps server rows (snake_case) onto the app's domain types.
 
 import Constants from 'expo-constants';
 import { NativeModules, Platform } from 'react-native';

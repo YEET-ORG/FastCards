@@ -273,9 +273,9 @@ function resolveWelcome(normalized: string): OnboardingCommandAction | null {
 }
 
 export interface OnboardingCommandOptions {
-  /** False for members who cannot set the household budget (a teen signing in
-   * on the demo build). The budget stage is unreachable for them, so "change
-   * budget" must not resolve to an action that would only fail server-side. */
+  /** False for members who cannot set the household budget (a teen signing
+   * in). The budget stage is unreachable for them, so "change budget" must
+   * not resolve to an action that would only fail server-side. */
   readonly canSetBudget?: boolean;
 }
 
